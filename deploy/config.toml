@@ -1,0 +1,14 @@
+bind = "0.0.0.0:3000"
+data_dir = "/var/lib/plant-journal"
+
+[sensor]
+# Change to iio after testing the sensor.
+adapter = "simulated"
+path = "/sys/bus/iio/devices/iio:device0"
+
+[camera]
+# Change to v4l2 after testing the camera.
+adapter = "simulated"
+device = "/dev/video0"
+format = "mjpeg"
+size = "1280x720"

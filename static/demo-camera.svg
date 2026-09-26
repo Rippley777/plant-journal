@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+<rect width="1280" height="720" fill="#e5e9df"/><path d="M0 560h1280v160H0z" fill="#c4cbb7"/>
+<g fill="none" stroke="#536f45" stroke-width="12"><path d="M330 530V210m0 160-100-100m100 55 105-105M660 530V170m0 140-100-95m100 190 110-95M960 530V240m0 140-95-80m95 5 85-65"/></g>
+<g fill="#6f8b58"><ellipse cx="252" cy="280" rx="75" ry="34" transform="rotate(35 252 280)"/><ellipse cx="403" cy="243" rx="80" ry="36" transform="rotate(-35 403 243)"/><ellipse cx="595" cy="240" rx="70" ry="34" transform="rotate(35 595 240)"/><ellipse cx="727" cy="340" rx="80" ry="38" transform="rotate(-35 727 340)"/><ellipse cx="896" cy="322" rx="68" ry="30" transform="rotate(35 896 322)"/><ellipse cx="1020" cy="263" rx="70" ry="34" transform="rotate(-35 1020 263)"/></g>
+<g fill="#ac7960"><path d="M240 490h180l-22 130H262z"/><path d="M565 490h190l-24 130H589z"/><path d="M875 490h170l-20 130H895z"/></g>
+<text x="50" y="65" fill="#35432f" font-family="sans-serif" font-size="28">SIMULATED CAMERA · Your grow space will appear here</text>
+</svg>

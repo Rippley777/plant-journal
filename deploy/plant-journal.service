@@ -1,0 +1,26 @@
+[Unit]
+Description=Plant Journal and Grow-Space Controller
+Wants=network-online.target time-sync.target
+After=network-online.target time-sync.target
+
+[Service]
+Type=simple
+User=plant-journal
+Group=plant-journal
+SupplementaryGroups=video
+Environment=PLANT_CONFIG=/etc/plant-journal/config.toml
+Environment=RUST_LOG=plant_journal=info,tower_http=info
+ExecStart=/usr/local/bin/plant-journal
+WorkingDirectory=/var/lib/plant-journal
+StateDirectory=plant-journal
+UMask=0027
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=40
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

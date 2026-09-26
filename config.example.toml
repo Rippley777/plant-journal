@@ -1,0 +1,18 @@
+# Copy to config.toml, then run: PLANT_CONFIG=config.toml cargo run --locked
+# Set to 0.0.0.0:3000 to access this service from other devices on your trusted LAN.
+bind = "127.0.0.1:3000"
+data_dir = "data"
+
+[sensor]
+# simulated | iio | disabled
+adapter = "simulated"
+# Used only by iio. Find the device whose `name` file contains dht11.
+path = "/sys/bus/iio/devices/iio:device0"
+
+[camera]
+# simulated | v4l2 | disabled
+adapter = "simulated"
+# Use a stable /dev/v4l/by-id/... path on the Pi after checking available formats.
+device = "/dev/video0"
+format = "mjpeg"
+size = "1280x720"

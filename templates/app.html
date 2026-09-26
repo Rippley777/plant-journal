@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#284b39"><title>{{ title }} · Fieldnotes</title>
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/app.css"><script src="/assets/app.js" defer></script>
+</head>
+<body data-page="{{ page }}">
+<aside class="sidebar">
+<a href="/" class="brand"><span class="brand-icon">❧</span><span>Fieldnotes<small>A little closer to your plants.</small></span></a>
+<div class="nav-label">YOUR GROW SPACE</div>
+<nav aria-label="Main navigation">
+<a href="/" data-nav="dashboard"><span>◈</span> Overview</a>
+<a href="/plants" data-nav="plants"><span>♧</span> Plants</a>
+<a href="/journal" data-nav="journal"><span>≡</span> Journal</a>
+<a href="/calendar" data-nav="calendar"><span>▦</span> Calendar</a>
+<a href="/photos" data-nav="photos"><span>▧</span> Photos</a>
+<div class="nav-label">IN THE TENT</div>
+<a href="/environment" data-nav="environment"><span>◌</span> Environment</a>
+<a href="/equipment" data-nav="equipment"><span>⌁</span> Equipment</a>
+<a href="/settings" data-nav="settings"><span>⚙</span> Settings</a>
+</nav>
+<div class="sidebar-footer"><span class="status-dot"></span> Local by nature<small>Your journal stays in your grow space.</small></div>
+</aside>
+<main>
+<header class="topbar"><span>GROW SPACE / <strong>{{ title }}</strong></span><span id="today"></span></header>
+<section class="page-heading"><div><p class="eyebrow" id="eyebrow">A GROWING RECORD</p><h1>{{ title }}</h1><p id="subtitle">A place for the small changes.</p></div><div id="page-actions"></div></section>
+<div id="notice" role="status" aria-live="polite" hidden></div>
+<div id="content" aria-busy="true"><div class="empty"><span class="sprout">♧</span><p>Opening your grow space…</p></div></div>
+<footer class="page-footer">FIELDNOTES <span>One day, one leaf, one observation at a time.</span></footer>
+</main>
+<dialog id="editor"><div class="dialog-heading"><h2 id="dialog-title"></h2><button type="button" class="icon-button" id="close-dialog" aria-label="Close dialog">×</button></div><div id="dialog-body"></div></dialog>
+</body>
+</html>
