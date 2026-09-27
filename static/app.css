@@ -218,3 +218,231 @@ body[data-page="strains"] .page-heading>div:first-child {min-width:0}
 .strain-tags .badge {white-space:normal;overflow-wrap:anywhere}
 
 .plant-cover{display:block;overflow:hidden}.plant-cover img{display:block;width:100%;height:100%;object-fit:cover}.plant-cover:hover img{filter:brightness(1.05)}
+
+/* The five additional palettes share semantic states; each supplies its own ink,
+   surfaces, accents, and specimen colors. All artwork stays local and in CSS. */
+:root:is([data-theme="herbarium"],[data-theme="seed_catalog"],[data-theme="solarpunk"],[data-theme="alchemy"],[data-theme="neon_genetics"]) {
+  --nav-label:var(--muted);
+  --nav-icon:var(--green);
+  --nav-active:var(--sage);
+  --nav-active-text:var(--green);
+  --nav-hover:var(--sage);
+  --status:var(--green);
+  --sprout:var(--green);
+  --day-outline:var(--green);
+  --day-selected:var(--sage);
+  --day-blank:var(--sidebar);
+  --photo-event:var(--art-warm-start);
+  --failure-event:var(--error-bg);
+  --chart-text:var(--muted);
+  --chart-stroke:var(--green);
+  --chart-line:var(--line);
+  --notice-line:var(--input-line);
+  --notice-bg:var(--sage);
+  --warning-line:var(--warning-text);
+  --notice-warning-bg:var(--warning-bg);
+  --notice-warning-text:var(--warning-text);
+  --error-line:var(--danger-line);
+  --notice-error-bg:var(--error-bg);
+}
+
+/* Herbarium: paper folios, olive ink, and engraved specimen illustrations. */
+:root[data-theme="herbarium"] {
+  color-scheme:light;
+  --paper:#f2eddf; --card:#fcf8ec; --ink:#353b2a; --muted:#62634f;
+  --green:#435536; --line:#ccc5ab; --sage:#e5e9d5; --terra:#855234;
+  --danger:#963c31; --button-text:#fffdf5; --input-line:#92987e; --focus:#80592c;
+  --sidebar:#e9e2d0; --danger-line:#b07767;
+  --warning-bg:#f3e5c1; --warning-text:#775016; --error-bg:#f5dfd6;
+  --art-start:#e6e9d2; --art-end:#d1d9b8; --art-ink:#50633d;
+  --art-warm-start:#eee0c8; --art-warm-end:#dfcaab; --art-warm-ink:#795132;
+  --art-cool-start:#dde5df; --art-cool-end:#c5d6c9; --art-cool-ink:#3e6455;
+  --dialog-shadow:#3b382a33; --backdrop:#353b2a80;
+  --specimen-ink:#435536; --specimen-paper:#e7ebd6;
+  --specimen-ink-1:#6c5071; --specimen-paper-1:#eee2e9;
+  --specimen-ink-2:#80512d; --specimen-paper-2:#f0e2c9;
+  --specimen-ink-3:#3d6170; --specimen-paper-3:#dfe9e8;
+  --specimen-ink-4:#884958; --specimen-paper-4:#efdee0;
+}
+[data-theme="herbarium"] body {
+  background-image:radial-gradient(#645a3614 .7px,transparent .7px);
+  background-size:5px 5px;
+}
+[data-theme="herbarium"] :is(h1,h2,h3,.brand) {font-family:Palatino,"Palatino Linotype","Book Antiqua",Georgia,serif}
+[data-theme="herbarium"] :is(.eyebrow,.nav-label,.stat label,.topbar,.card-header a,.event-time) {font-family:"Courier New",monospace}
+[data-theme="herbarium"] :is(.card,.stat,dialog,.collection-banner) {border-radius:2px;box-shadow:3px 4px 0 #5756370b}
+[data-theme="herbarium"] .card-header {border-bottom-style:double;border-bottom-width:3px}
+[data-theme="herbarium"] :is(button,.button,input,select,textarea,nav a) {border-radius:2px}
+[data-theme="herbarium"] nav a.active {box-shadow:inset 3px 0 var(--green)}
+[data-theme="herbarium"] .plant-art:not(.plant-cover) {outline:1px solid #596e3d44;outline-offset:-12px}
+[data-theme="herbarium"] .strain-card {border-radius:2px}
+[data-theme="herbarium"] .strain-card-art {border-radius:0;border-style:double;border-width:3px}
+[data-theme="herbarium"] .strain-emblem .emblem-leaves {fill-opacity:.08;stroke-width:1.8}
+[data-theme="herbarium"] .strain-card-seal {border-top:1px solid currentColor;padding-top:5px}
+[data-theme="herbarium"] .lineage-edges path {stroke:var(--green);stroke-dasharray:4 3}
+
+/* Seed Catalog '79: warm seed packets, letterpress type, and harvest stripes. */
+:root[data-theme="seed_catalog"] {
+  color-scheme:light;
+  --paper:#f8e8c5; --card:#fff6df; --ink:#432d1b; --muted:#73583b;
+  --green:#943e21; --line:#d4b37d; --sage:#f1dfb5; --terra:#7b4921;
+  --danger:#a02825; --button-text:#fff8e5; --input-line:#a9824d; --focus:#48603d;
+  --sidebar:#f4dfaf; --danger-line:#ba7461;
+  --warning-bg:#f3df9e; --warning-text:#765014; --error-bg:#f6dcd0;
+  --art-start:#eed29b; --art-end:#e3b878; --art-ink:#88461e;
+  --art-warm-start:#f4d4b5; --art-warm-end:#eaba8c; --art-warm-ink:#993f25;
+  --art-cool-start:#e2e3b1; --art-cool-end:#c5cd91; --art-cool-ink:#526132;
+  --dialog-shadow:#73472133; --backdrop:#432d1b80;
+  --specimen-ink:#914321; --specimen-paper:#f5d6ac;
+  --specimen-ink-1:#655e29; --specimen-paper-1:#e8e5bb;
+  --specimen-ink-2:#87580d; --specimen-paper-2:#f6e2a9;
+  --specimen-ink-3:#3f6567; --specimen-paper-3:#d7e5d9;
+  --specimen-ink-4:#933f44; --specimen-paper-4:#f1d6ce;
+}
+[data-theme="seed_catalog"] body {
+  background-image:radial-gradient(#8a551816 1px,transparent 1px);
+  background-size:6px 6px;
+}
+[data-theme="seed_catalog"] :is(h1,h2,h3,.brand,.stat .value,.device-state strong) {font-family:Georgia,"Times New Roman",serif;font-weight:900;letter-spacing:-.045em}
+[data-theme="seed_catalog"] :is(.eyebrow,.nav-label,.stat label) {font-weight:800;color:var(--green)}
+[data-theme="seed_catalog"] .page-heading {border-top:6px solid var(--green);margin-top:24px;padding-top:25px}
+[data-theme="seed_catalog"] :is(.card,.stat,dialog,.collection-banner) {border-radius:7px;border-color:var(--input-line);box-shadow:3px 4px 0 #9b61231a}
+[data-theme="seed_catalog"] .card-header {background:var(--sage)}
+[data-theme="seed_catalog"] :is(button,.button) {border-radius:4px;font-weight:750}
+[data-theme="seed_catalog"] nav a.active {background:var(--green);color:var(--button-text)}
+[data-theme="seed_catalog"] nav a.active span {color:inherit}
+[data-theme="seed_catalog"] .plant-art:not(.plant-cover) {border-bottom:7px solid var(--green)}
+[data-theme="seed_catalog"] .strain-card {border-radius:5px;border-style:dashed}
+[data-theme="seed_catalog"] .strain-card-top {font-weight:700;border-bottom:3px solid var(--foil);margin-bottom:8px}
+[data-theme="seed_catalog"] .strain-card-art {border-radius:50% 50% 4px 4px}
+[data-theme="seed_catalog"] .strain-card h2 {font-weight:900}
+[data-theme="seed_catalog"] .collection-banner {border-top:6px solid var(--green)}
+
+/* Solarpunk Greenhouse: sunlit surfaces, curved glass panels, and terracotta. */
+:root[data-theme="solarpunk"] {
+  color-scheme:light;
+  --paper:#f0f8f1; --card:#fcfffa; --ink:#163c37; --muted:#506b64;
+  --green:#1a6556; --line:#c2d9cc; --sage:#dff0e4; --terra:#99482e;
+  --danger:#a13c38; --button-text:#ffffff; --input-line:#7caa97; --focus:#315fac;
+  --sidebar:#e5f3eb; --danger-line:#bd8176;
+  --warning-bg:#fbebbf; --warning-text:#765415; --error-bg:#fbe2db;
+  --art-start:#d9f1de; --art-end:#bce2cc; --art-ink:#267052;
+  --art-warm-start:#f9e6c6; --art-warm-end:#f0cbaa; --art-warm-ink:#974e33;
+  --art-cool-start:#e1eff6; --art-cool-end:#c1dbe9; --art-cool-ink:#366c8e;
+  --dialog-shadow:#23564729; --backdrop:#163c376b;
+  --specimen-ink:#23684f; --specimen-paper:#dcf2df;
+  --specimen-ink-1:#73558d; --specimen-paper-1:#eee3f7;
+  --specimen-ink-2:#985028; --specimen-paper-2:#fbe3c9;
+  --specimen-ink-3:#30618f; --specimen-paper-3:#ddecfb;
+  --specimen-ink-4:#9b4765; --specimen-paper-4:#fbe0e7;
+}
+[data-theme="solarpunk"] body {
+  background-image:radial-gradient(ellipse at 90% 0,#ffe8a566,transparent 45%),linear-gradient(135deg,#d4eed522,transparent 70%);
+}
+[data-theme="solarpunk"] :is(h1,h2,h3,.brand,.stat .value,.device-state strong) {font-family:"Avenir Next",Avenir,"Trebuchet MS",sans-serif;font-weight:650;letter-spacing:-.04em}
+[data-theme="solarpunk"] :is(.card,.stat,dialog,.collection-banner) {border-radius:22px;box-shadow:0 8px 28px #2d77560a}
+[data-theme="solarpunk"] .card-header {background:linear-gradient(110deg,#dcf1dd70,#ffefcc55)}
+[data-theme="solarpunk"] :is(button,.button,nav a) {border-radius:22px}
+[data-theme="solarpunk"] :is(input,select,textarea) {border-radius:12px}
+[data-theme="solarpunk"] .stat {border-top:4px solid var(--green)}
+[data-theme="solarpunk"] .stat:nth-child(even) {border-top-color:var(--terra)}
+[data-theme="solarpunk"] .plant-art:not(.plant-cover) {border-bottom:1px solid var(--line)}
+[data-theme="solarpunk"] .strain-card {border-radius:22px}
+[data-theme="solarpunk"] .strain-card-art {border-radius:16px}
+[data-theme="solarpunk"] .collection-banner {background:radial-gradient(ellipse at top right,#ffe3a477,transparent 65%),linear-gradient(120deg,var(--sage),var(--card))}
+[data-theme="solarpunk"] .lineage-edges path {stroke:var(--green);stroke-width:2}
+
+/* Alchemy Lab: plum velvet, brass frames, and illuminated botanical folios. */
+:root[data-theme="alchemy"] {
+  color-scheme:dark;
+  --paper:#1b1524; --card:#292035; --ink:#f2e8d7; --muted:#c0b2c6;
+  --green:#e0bf79; --line:#594461; --sage:#3c3040; --terra:#d1a8dc;
+  --danger:#ffafaf; --button-text:#251c2b; --input-line:#8e7296; --focus:#e0bf79;
+  --sidebar:#20192a; --danger-line:#b47181;
+  --warning-bg:#443520; --warning-text:#f4d392; --error-bg:#4d2937;
+  --art-start:#3c3048; --art-end:#252033; --art-ink:#e0bf79;
+  --art-warm-start:#473144; --art-warm-end:#2e2037; --art-warm-ink:#e3acd1;
+  --art-cool-start:#293c3c; --art-cool-end:#202c32; --art-cool-ink:#a2cdbb;
+  --dialog-shadow:#00000080; --backdrop:#0e0a15b3;
+  --specimen-ink:#e0bf79; --specimen-paper:#423447;
+  --specimen-ink-1:#d6b1ef; --specimen-paper-1:#3b2c50;
+  --specimen-ink-2:#f1bc91; --specimen-paper-2:#493443;
+  --specimen-ink-3:#a4d4d3; --specimen-paper-3:#273c47;
+  --specimen-ink-4:#f0aeca; --specimen-paper-4:#482f48;
+}
+[data-theme="alchemy"] body {
+  background-image:radial-gradient(ellipse at 80% 0,#a06ba61c,transparent 65%),radial-gradient(#e0bf7917 .8px,transparent .8px);
+  background-size:auto,24px 24px;
+}
+[data-theme="alchemy"] :is(h1,h2,h3,.brand,.stat .value) {font-family:Baskerville,"Palatino Linotype",Palatino,Georgia,serif}
+[data-theme="alchemy"] h1 {color:var(--green);letter-spacing:.015em}
+[data-theme="alchemy"] :is(.eyebrow,.nav-label,.topbar) {letter-spacing:1.8px}
+[data-theme="alchemy"] :is(.card,.stat,dialog,.collection-banner) {border-radius:10px;box-shadow:inset 0 0 0 3px #e0bf7908,0 8px 24px #00000020}
+[data-theme="alchemy"] .card-header {border-bottom-color:#e0bf7940;background:linear-gradient(120deg,#e0bf790c,transparent)}
+[data-theme="alchemy"] nav a.active {box-shadow:inset 2px 0 var(--green)}
+[data-theme="alchemy"] .profile-description {font-family:Palatino,Georgia,serif;font-style:italic;font-size:17px}
+[data-theme="alchemy"] .plant-art:not(.plant-cover) {outline:1px solid #e0bf7940;outline-offset:-12px}
+[data-theme="alchemy"] .strain-card {border-radius:12px 12px 3px 3px}
+[data-theme="alchemy"] .strain-card-art {border-radius:45% 45% 6px 6px;border-color:#e0bf7940}
+[data-theme="alchemy"] .strain-emblem .emblem-orbit {opacity:.6;stroke-dasharray:3 4}
+[data-theme="alchemy"] .strain-card-seal {letter-spacing:1px}
+[data-theme="alchemy"] .collection-banner {background:radial-gradient(ellipse at top right,#ae82b529,transparent 70%),var(--card)}
+[data-theme="alchemy"] .lineage-edges path {stroke:var(--green);opacity:.75}
+[data-theme="alchemy"] .lineage-root rect {stroke:var(--green);fill:var(--sage)}
+
+/* Neon Genetics: cyan instruments, magenta specimens, and luminous pedigrees. */
+:root[data-theme="neon_genetics"] {
+  color-scheme:dark;
+  --paper:#080e16; --card:#101e2c; --ink:#e1f6ff; --muted:#a1bdcf;
+  --green:#64e9f5; --line:#2c465c; --sage:#173344; --terra:#ffa2d6;
+  --danger:#ffafb7; --button-text:#071c26; --input-line:#537b96; --focus:#ffa2d6;
+  --sidebar:#0b1622; --danger-line:#a96582;
+  --warning-bg:#3c3420; --warning-text:#f8d883; --error-bg:#442a3c;
+  --art-start:#153c4b; --art-end:#102135; --art-ink:#64e9f5;
+  --art-warm-start:#3c234d; --art-warm-end:#1e203a; --art-warm-ink:#ffa2d6;
+  --art-cool-start:#203d31; --art-cool-end:#142736; --art-cool-ink:#b9ee8b;
+  --dialog-shadow:#00000099; --backdrop:#030913cc;
+  --specimen-ink:#64e9f5; --specimen-paper:#163749;
+  --specimen-ink-1:#ffa2d6; --specimen-paper-1:#39263f;
+  --specimen-ink-2:#b9ee8b; --specimen-paper-2:#223c33;
+  --specimen-ink-3:#adbbff; --specimen-paper-3:#242e50;
+  --specimen-ink-4:#ffd083; --specimen-paper-4:#3d332a;
+}
+[data-theme="neon_genetics"] body {
+  background-image:radial-gradient(ellipse at 100% 0,#ae409017,transparent 55%),radial-gradient(#64e9f519 1px,transparent 1px);
+  background-size:auto,20px 20px;
+}
+[data-theme="neon_genetics"] :is(h1,h2,h3,.brand,.stat .value,.device-state strong) {font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-weight:650;letter-spacing:-.06em}
+[data-theme="neon_genetics"] :is(.eyebrow,.nav-label,.topbar,.stat label,.strain-card-species) {font-family:ui-monospace,monospace}
+[data-theme="neon_genetics"] h1 {text-shadow:0 0 24px #64e9f526}
+[data-theme="neon_genetics"] .brand {font-size:24px}
+[data-theme="neon_genetics"] :is(.card,.stat,dialog,.collection-banner) {border-radius:2px 16px 2px 16px;box-shadow:0 0 0 1px #64e9f507,0 6px 24px #00000033}
+[data-theme="neon_genetics"] .card-header {background:linear-gradient(90deg,#64e9f50a,transparent);border-left:2px solid var(--green)}
+[data-theme="neon_genetics"] :is(button,.button,input,select,textarea,nav a) {border-radius:2px}
+[data-theme="neon_genetics"] nav a.active {box-shadow:inset 3px 0 var(--green);background:linear-gradient(90deg,var(--sage),transparent)}
+[data-theme="neon_genetics"] .stat {border-top:2px solid var(--green)}
+[data-theme="neon_genetics"] .stat:nth-child(even) {border-top-color:var(--terra)}
+[data-theme="neon_genetics"] .badge {border-radius:3px}
+[data-theme="neon_genetics"] .plant-art:not(.plant-cover) {text-shadow:0 0 18px currentColor;border-bottom:1px solid var(--green)}
+[data-theme="neon_genetics"] .strain-card {border-radius:2px 18px 2px 18px}
+[data-theme="neon_genetics"] .strain-card-art {border-radius:0 10px 0 10px}
+[data-theme="neon_genetics"] .strain-card.is-collected {box-shadow:0 0 16px #64e9f515}
+[data-theme="neon_genetics"] .strain-card.is-collected .strain-emblem {filter:drop-shadow(0 0 7px var(--foil))}
+[data-theme="neon_genetics"] .collection-banner {background:linear-gradient(115deg,#64e9f511,#ffa2d60a),var(--card)}
+[data-theme="neon_genetics"] .lineage-edges path {stroke:var(--green);stroke-width:2;filter:drop-shadow(0 0 3px #64e9f566)}
+[data-theme="neon_genetics"] .lineage-root rect {stroke:var(--terra);filter:drop-shadow(0 0 4px #ffa2d633)}
+[data-theme="neon_genetics"] .chart path {filter:drop-shadow(0 0 3px #64e9f54d)}
+
+:is([data-theme="herbarium"],[data-theme="seed_catalog"],[data-theme="solarpunk"],[data-theme="alchemy"],[data-theme="neon_genetics"]) :is(input,textarea)::placeholder {color:var(--muted);opacity:1}
+/* Specimen variants retain their own colors in every new theme. */
+:is([data-theme="herbarium"],[data-theme="seed_catalog"],[data-theme="solarpunk"],[data-theme="alchemy"],[data-theme="neon_genetics"]) .strain-card {--foil:var(--specimen-ink);--foil-bg:var(--specimen-paper)}
+:is([data-theme="herbarium"],[data-theme="seed_catalog"],[data-theme="solarpunk"],[data-theme="alchemy"],[data-theme="neon_genetics"]) .strain-card.tone-1 {--foil:var(--specimen-ink-1);--foil-bg:var(--specimen-paper-1)}
+:is([data-theme="herbarium"],[data-theme="seed_catalog"],[data-theme="solarpunk"],[data-theme="alchemy"],[data-theme="neon_genetics"]) .strain-card.tone-2 {--foil:var(--specimen-ink-2);--foil-bg:var(--specimen-paper-2)}
+:is([data-theme="herbarium"],[data-theme="seed_catalog"],[data-theme="solarpunk"],[data-theme="alchemy"],[data-theme="neon_genetics"]) .strain-card.tone-3 {--foil:var(--specimen-ink-3);--foil-bg:var(--specimen-paper-3)}
+:is([data-theme="herbarium"],[data-theme="seed_catalog"],[data-theme="solarpunk"],[data-theme="alchemy"],[data-theme="neon_genetics"]) .strain-card.tone-4 {--foil:var(--specimen-ink-4);--foil-bg:var(--specimen-paper-4)}
+
+@media(max-width:760px) {
+  [data-theme="seed_catalog"] .page-heading {margin-top:18px;padding-top:20px}
+  [data-theme="alchemy"] .topbar {letter-spacing:.5px}
+  [data-theme="solarpunk"] :is(.card,.stat,dialog,.collection-banner) {border-radius:16px}
+}

@@ -89,6 +89,8 @@ with sqlite3.connect(sys.argv[1]) as db:
     }
   };
   await go('/settings');
+  const themeIds = ['fieldnotes','arcade','herbarium','seed_catalog','solarpunk','alchemy','neon_genetics'];
+  assert.deepEqual(await page.locator('#theme-select option').evaluateAll(options=>options.map(option=>option.value)),themeIds);
   assert.equal(await page.getByLabel('Theme', {exact:true}).inputValue(), 'fieldnotes');
   const defaultPaper = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
   await page.getByLabel('Theme', {exact:true}).selectOption('arcade');
@@ -277,19 +279,32 @@ with sqlite3.connect(sys.argv[1]) as db:
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,`Mobile overflow on ${path}`);
   }
   await go('/calendar');await page.screenshot({path:join(artifacts,'calendar-mobile.png'),fullPage:true});
-  await go('/settings');
-  await page.getByLabel('Theme', {exact:true}).selectOption('arcade');
-  for (const width of [1440,390]) {
-    await page.setViewportSize({width,height:width===390?844:1050});
-    for (const path of ['/','/plants','/seeds','/strains','/journal','/calendar','/photos','/environment','/equipment','/settings']) {
-      await go(path);
-      assert.equal(await page.locator('html').getAttribute('data-theme'), 'arcade');
-      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Night Arcade overflow at ${width}px on ${path}`);
-      if (['/','/strains','/settings','/calendar','/environment'].includes(path)) {
-        await page.screenshot({path:join(artifacts,`arcade-${path.slice(1)||'overview'}-${width}.png`),fullPage:path!=='/strains'});
+  const appearanceTab=await context.newPage();
+  await appearanceTab.goto(base+'/login');
+  for (const theme of themeIds.slice(1)) {
+    await go('/settings');
+    await page.getByLabel('Theme', {exact:true}).selectOption(theme);
+    await appearanceTab.waitForFunction(theme=>document.documentElement.dataset.theme===theme,theme);
+    await page.reload();await page.locator('#content[aria-busy="false"]').waitFor();
+    assert.equal(await page.getByLabel('Theme', {exact:true}).inputValue(),theme);
+    for (const width of [1440,390]) {
+      await page.setViewportSize({width,height:width===390?844:1050});
+      for (const path of ['/','/plants','/seeds','/strains','/journal','/calendar','/photos','/environment','/equipment','/settings']) {
+        await go(path);
+        assert.equal(await page.locator('html').getAttribute('data-theme'),theme);
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${theme} overflow at ${width}px on ${path}`);
+        if (['/','/strains','/settings'].includes(path)) {
+          await page.screenshot({path:join(artifacts,`${theme}-${path.slice(1)||'overview'}-${width}.png`),fullPage:path!=='/strains'});
+        }
       }
+      await go('/plants');
+      await page.getByRole('button',{name:'+ Add a plant',exact:true}).click();
+      assert.ok(await dialog().isVisible());
+      assert.ok(await dialog().evaluate(el=>el.scrollWidth<=el.clientWidth),`${theme} dialog overflow at ${width}px`);
+      await dialog().getByRole('button',{name:'Cancel',exact:true}).click();await closed();
     }
   }
+  await appearanceTab.close();
   await go('/plants');
   await page.locator('.plant-card').filter({has:page.getByRole('link',{name:'Monstera',exact:true})}).getByRole('button',{name:'Edit',exact:true}).click();
   await dialog().getByLabel('Archive plant (keep its history)').check();

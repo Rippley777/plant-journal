@@ -49,7 +49,11 @@ cards automatically. The original owner's garden starts with 152 curated cannabi
 strains and selected documented parentage. See [strain collection and lineage](docs/strains.md)
 for collection rules, sources, and database upgrade details.
 
-Choose **Settings → Appearance → Theme** to switch between the default **Fieldnotes** look and **Night Arcade**, a dark gamer-inspired theme. Changes apply instantly and are remembered in this browser across gardens and visits, including the sign-in page.
+Choose **Settings → Appearance → Theme** for seven looks: the default **Fieldnotes**,
+**Night Arcade**, **Herbarium**, **Seed Catalog ’79**, **Solarpunk Greenhouse**,
+**Alchemy Lab**, and **Neon Genetics**. Each includes matching strain cards and
+ancestry graphs. Changes apply instantly and are remembered in this browser across
+gardens and visits, including the sign-in page.
 
 All automation starts disabled. Settings initially use `America/Chicago` and a noon photo time. Choose a photo time during your lights-on window. Camera capture never switches the grow light on automatically.
 
