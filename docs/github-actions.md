@@ -12,15 +12,15 @@ Dockerfile to build a `linux/amd64` image. It runs on pull requests targeting
   `plantjournaldaac2bd8.azurecr.io/plant-journal:sha-<full-Git-commit-SHA>`.
 - Manual runs on other branches build/test only. No moving `latest` tag is updated.
 - Buildx caches build layers between runs. Dependencies are pinned in `Cargo.lock`;
-  GitHub actions are pinned to verified release commits with version comments.
-- The workflow does not run SQL migrations, access `.env`, or deploy an App Service
-  website. It handles continuous integration and delivery to the registry.
+  Build/publish actions are pinned to release commits with version comments.
+- After publishing, successful `main` runs deploy that commit image to the
+  `plant-journal` App Service using its Azure-generated OIDC identity.
+- The workflow does not run SQL migrations or access `.env`.
 
 ## One-time GitHub and Azure setup
 
-This checkout currently has no GitHub remote configured. Push it to your intended
-GitHub repository, including the workflow and Docker build inputs. Pull-request CI
-works without Azure identity settings; publishing requires the setup below.
+Pull-request CI works without Azure identity settings; publishing requires the
+setup below.
 
 1. Create a GitHub environment named **`acr-publish`** under repository Settings →
    Environments. Restrict its deployment branches to **`main`**.
@@ -67,3 +67,34 @@ If you rename the main branch, update the workflow's branch filters and publish
 conditions, plus the GitHub environment's deployment branch rule. If you change
 registries, update `ACR_NAME` and `ACR_LOGIN_SERVER` in the workflow and scope the
 publishing identity to the new registry.
+
+## App Service deployment
+
+The deploy job retains the three `AZUREAPPSERVICE_CLIENTID_*`,
+`AZUREAPPSERVICE_TENANTID_*`, and `AZUREAPPSERVICE_SUBSCRIPTIONID_*` secret names
+from the Azure-generated workflow. Keep those repository secrets and its
+federated credential for `repo:OWNER/REPOSITORY:ref:refs/heads/main`.
+That identity needs permission to deploy to the `plant-journal` App Service.
+It is separate from the `acr-publish` identity above.
+
+In App Service, configure the container source as Azure Container Registry,
+registry `plantjournaldaac2bd8.azurecr.io`, repository `plant-journal`. Enable
+App Service's managed identity and give it `AcrPull` on this registry (or the
+corresponding Repository Reader role for an ABAC-enabled registry), and configure
+container pulls to use that identity. GitHub's push permission does not give App
+Service permission to pull. Configure the container target port as **3000**
+(`WEBSITES_PORT=3000` for classic containers; target port 3000 for sidecar-enabled
+apps). Set the SQL credentials, persistent storage, and authentication described
+in [Runtime settings](azure-container.md#runtime-settings) before deploying.
+
+The generated Static Web Apps and duplicate App Service workflows were removed.
+This application serves HTML, static assets, and APIs from one Rust process; it
+has no npm build or independently deployable static frontend. Static Web Apps
+cannot host that process. Its generated npm helper install caused Oryx to detect
+Node.js. Adding a dummy npm build or skipping Oryx would not deploy the server.
+The unused Static Web App resource can be removed separately in Azure.
+
+The generated container workflow targeted `mcr.microsoft.com/.../appsvc/staticsite`,
+a Microsoft image location, instead of the project's writable registry. The
+consolidated workflow builds, tests, pushes to ACR, then deploys the same SHA tag.
+See [Microsoft's container deployment guide](https://learn.microsoft.com/en-us/azure/app-service/deploy-container-github-action).

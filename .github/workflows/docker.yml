@@ -120,3 +120,29 @@ jobs:
       - name: Sign out of registry
         if: always()
         run: docker logout "$ACR_LOGIN_SERVER"
+
+  deploy:
+    name: Deploy tested image to App Service
+    needs: publish
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # Keep the branch-based OIDC identity created by App Service. The registry
+      # publisher uses a separate identity scoped to the acr-publish environment.
+      - name: Sign in to Azure
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_40500D3F48384586A0E1AE58B856CADC }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_FF9DE6EB6F2E48DBB09B5094B885D277 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_F7417CEAF7F64E98BABD5F24A1EB0D94 }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@b686016b4de8820a23519503685d8d03fbfa03a6 # v3
+        with:
+          app-name: plant-journal
+          slot-name: Production
+          images: ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}

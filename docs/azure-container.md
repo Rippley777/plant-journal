@@ -20,7 +20,9 @@ plantjournaldaac2bd8.azurecr.io/plant-journal@sha256:722cfbf9bda0eb27e44313f8346
 - Platform: `linux/amd64`.
 - ACR build `cj1`: succeeded; 42 tests passed, live Azure SQL test ignored.
 - ACR runtime check `cj2`: succeeded; the published image returned `plant-journal 0.1.0`.
-- This publishes the image only. An App Service website has not been created or deployed.
+- That initial publication only pushed the image. The GitHub workflow now also
+  deploys successful `main` builds to the `plant-journal` App Service once its
+  identities and runtime settings are configured.
 
 To publish a new version to the same registry:
 
