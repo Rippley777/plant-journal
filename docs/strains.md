@@ -30,11 +30,17 @@ Card artwork is an original botanical emblem, not a photograph of the cultivar.
 ## Starter binder
 
 On the first application startup after schema migration, the existing original
-garden owned by `ally.rippley@gmail.com` gets 52 starter cards. Other gardens and
+garden owned by `ally.rippley@gmail.com` gets 152 starter cards. Other gardens and
 accounts are not prepopulated. This is a curated starting set of familiar cannabis
 names and ancestry records, not an exhaustive or ranked worldwide popularity list.
 
-The starter records are in [starter-strains.json](../resources/starter-strains.json).
+The original 52 records are in [starter-strains.json](../resources/starter-strains.json);
+the 100 additional records are in [expanded-strains.json](../resources/expanded-strains.json).
+The expansion includes the ten seed lines shown in the supplied order, with
+breeders recorded separately. Those lines have no assumed parentage. A product
+listing is not evidence of ownership, so each card starts unowned unless linked
+to an existing plant or positive-quantity seed inventory.
+
 Names were selected using Leafly's [top strains collection](https://www.leafly.com/news/strains-products/top-100-marijuana-strains)
 and [2025 sales review](https://www.leafly.com/news/strains-products/best-selling-weed-strains),
 checked September 27, 2026. Blue Dream's recorded ancestry also has a
@@ -51,12 +57,14 @@ Starter cards begin unowned unless an existing plant's name/species or a seed's
 name/variety exactly matches a catalog name or listed alias after case/whitespace
 normalization. Conflicting matches are skipped. Existing strain links are preserved,
 and zero seed quantity does not unlock a card. Archived plants count as historical
-acquisitions during this initial import. The import runs once in a transaction;
-restarts do not reset statuses, overwrite edits, or recreate deleted cards.
+acquisitions during this initial import. Each catalog version imports once in a transaction; the 100 new cards are also
+added to existing collections without resetting statuses, overwriting edits, or
+recreating deleted cards.
 
 ## Database upgrade
 
-Schema version 5 adds `strains`, `strain_catalog_imports`, and nullable `strain_id`
+Schema version 6 tracks the catalog import version so existing gardens receive the
+new cards once. Schema version 5 adds `strains`, `strain_catalog_imports`, and nullable `strain_id`
 columns on `plants` and `seeds`. A strain has two optional references to parent
 strains rather than storing its family tree as a text field. Existing data is
 retained. SQLite migrates on startup. For Azure SQL deployments with automatic

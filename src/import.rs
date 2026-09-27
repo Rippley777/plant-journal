@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, path::Path};
 
 const TABLES: &[(&str, &str)] = &[
     ("strains", "id,garden_id,name,name_key,species,breeder,notes,status,lineage_note,source_url,created_at"),
-    ("strain_catalog_imports", "garden_id,imported_at"),
+    ("strain_catalog_imports", "garden_id,imported_at,catalog_version"),
     (
         "seeds",
         "id,name,variety,quantity,unit,supplier,purchase_year,storage_location,notes,created_at,strain_id",
@@ -107,6 +107,17 @@ pub async fn sqlite_to_database(
             .await?;
             if has_strain == 0 {
                 selected_columns = selected_columns.replace("strain_id", "NULL AS strain_id");
+            }
+        }
+        if *table == "strain_catalog_imports" {
+            let has_version: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM pragma_table_info('strain_catalog_imports') WHERE name='catalog_version'",
+            )
+            .fetch_one(&mut *snapshot)
+            .await?;
+            if has_version == 0 {
+                selected_columns =
+                    selected_columns.replace("catalog_version", "1 AS catalog_version");
             }
         }
         let source_sql = if *table == "settings" && has_gardens > 0 {

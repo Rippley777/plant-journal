@@ -82,7 +82,7 @@ async fn azure_sql_end_to_end_contract() {
     let router = api::router(app.clone());
     let (status, cards) = request(&router, "GET", "/api/v1/strains", None).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(cards.as_array().unwrap().len(), 52);
+    assert_eq!(cards.as_array().unwrap().len(), 152);
     let parent = cards
         .as_array()
         .unwrap()

@@ -61,6 +61,92 @@ async fn list(router: &Router) -> Vec<Value> {
         .unwrap()
         .clone()
 }
+#[tokio::test]
+async fn catalog_upgrade_adds_only_missing_cards_and_preserves_existing_edits() {
+    let (_dir, app, _router) = setup().await;
+    let expanded: Vec<Value> =
+        serde_json::from_str(include_str!("../resources/expanded-strains.json")).unwrap();
+    db::query("UPDATE strains SET parent_one_id=NULL,parent_two_id=NULL")
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    for card in &expanded {
+        db::query("DELETE FROM strains WHERE name=?")
+            .bind(card["name"].as_str().unwrap())
+            .execute(&app.pool)
+            .await
+            .unwrap();
+    }
+    db::query("UPDATE strain_catalog_imports SET catalog_version=1")
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    db::query("UPDATE strains SET status='wanted',notes='Saved edit' WHERE name='OG Kush'")
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    db::query("DELETE FROM strains WHERE name='ACDC'")
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    db::query("INSERT INTO strains(id,garden_id,name,name_key,species,breeder,status,lineage_note,source_url,created_at) VALUES('owned-line',?,?,?,'Cannabis','My breeder','wanted','My lineage','',1)")
+        .bind(plant_journal::auth::LEGACY_GARDEN).bind("Diesel Regular").bind("diesel regular")
+        .execute(&app.pool).await.unwrap();
+    strains::seed_starter_collection(&app.pool).await.unwrap();
+    let count: i64 = db::query_scalar("SELECT COUNT(*) FROM strains")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 151);
+    let edited: db::Record = db::query_as("SELECT status,notes FROM strains WHERE name='OG Kush'")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(edited.get::<String>("status").unwrap(), "wanted");
+    assert_eq!(edited.get::<String>("notes").unwrap(), "Saved edit");
+    let breeder: String =
+        db::query_scalar("SELECT breeder FROM strains WHERE name='Diesel Regular'")
+            .fetch_one(&app.pool)
+            .await
+            .unwrap();
+    assert_eq!(breeder, "My breeder");
+    let absent: i64 = db::query_scalar("SELECT COUNT(*) FROM strains WHERE name='ACDC'")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(absent, 0);
+    for name in [
+        "GG#4 Original Glue Regular",
+        "Special Kush #1",
+        "Northern Lights 10 of 10",
+        "Girl Scout Cookies Fast Version",
+        "Do-Si-Dos (Herbies Seeds)",
+        "Godfather OG",
+        "CBD Amnesia",
+        "Bruce Banner Fast Version",
+        "Northern Lights #10",
+    ] {
+        let status: String = db::query_scalar("SELECT status FROM strains WHERE name=?")
+            .bind(name)
+            .fetch_one(&app.pool)
+            .await
+            .unwrap();
+        assert_eq!(status, "unowned", "{name}");
+    }
+    let version: i64 = db::query_scalar("SELECT catalog_version FROM strain_catalog_imports")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(version, 2);
+    strains::seed_starter_collection(&app.pool).await.unwrap();
+    assert_eq!(
+        db::query_scalar::<i64>("SELECT COUNT(*) FROM strains")
+            .fetch_one(&app.pool)
+            .await
+            .unwrap(),
+        151
+    );
+}
 async fn add(router: &Router, name: &str, parents: Option<(&str, &str)>) -> String {
     let mut body = json!({"name":name,"status":"wanted"});
     if let Some((a, b)) = parents {
@@ -271,7 +357,7 @@ async fn collected_cards_follow_inventory_and_survive_restart() {
     let reopened = App::open(config).await.unwrap();
     common::session(&reopened).await;
     let cards = list(&api::router(reopened)).await;
-    assert_eq!(cards.len(), 55);
+    assert_eq!(cards.len(), 155);
     assert_eq!(
         cards.iter().find(|s| s["id"] == id).unwrap()["status"],
         "collected"
@@ -459,7 +545,7 @@ async fn upgrade_seeds_only_original_garden_and_matches_existing_inventory_once(
         .fetch_one(&app.pool)
         .await
         .unwrap();
-    assert_eq!(count, 52);
+    assert_eq!(count, 152);
     let collected: Vec<db::Record> =
         db::query_as("SELECT name FROM strains WHERE status='collected' ORDER BY name")
             .fetch_all(&app.pool)
@@ -498,7 +584,7 @@ async fn upgrade_seeds_only_original_garden_and_matches_existing_inventory_once(
             .fetch_one(&app.pool)
             .await
             .unwrap(),
-        51
+        151
     );
     assert_eq!(
         db::query_scalar::<String>("SELECT notes FROM strains WHERE name='OG Kush'")

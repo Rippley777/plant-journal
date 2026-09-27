@@ -128,7 +128,7 @@ async fn import_preserves_history_links_and_claims_but_disables_automation() {
     .await
     .unwrap();
     assert_eq!(counts["plants"], 1);
-    assert_eq!(counts["strains"], 52);
+    assert_eq!(counts["strains"], 152);
     let lineage: String = db::query_scalar("SELECT p.name FROM strains s JOIN strains p ON p.id=s.parent_one_id WHERE s.name='Blue Dream'").fetch_one(&destination.pool).await.unwrap();
     assert_eq!(lineage, "Blueberry");
     assert_eq!(counts["photo_plants"], 1);

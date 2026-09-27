@@ -1,0 +1,643 @@
+[
+  {
+    "name": "GMO Cookies",
+    "aliases": [],
+    "parents": [
+      "Chemdog",
+      "GSC"
+    ],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Mendo Breath",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Motorbreath",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "TK41",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Alien OG",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Rainbow Belts",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Dutch Treat",
+    "aliases": [],
+    "parents": [
+      "Northern Lights",
+      "Haze"
+    ],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Cheese",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Blueberry Muffins",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Stardawg",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Orange Creamsicle",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Grape Stomper",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Key Lime Pie",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Grape Pie",
+    "aliases": [],
+    "parents": [
+      "Cherry Pie",
+      "Grape Stomper"
+    ],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Slurricane",
+    "aliases": [],
+    "parents": [
+      "Do-Si-Dos",
+      "Purple Punch"
+    ],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "LA Kush Cake",
+    "aliases": [],
+    "parents": [
+      "Wedding Cake",
+      "Kush Mints"
+    ],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Skywalker OG",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Master Kush",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Animal Cookies",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Sundae Driver",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "King Louis",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Hash Burger",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Tahoe OG",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "9 Pound Hammer",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Purple Urkle",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Blackberry Kush",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Pink Kush",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Papaya Punch",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "God’s Gift",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Maui Wowie",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Acapulco Gold",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Alaskan Thunder Fuck",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Tropicana Cookies",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "White Fire OG",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Lamb’s Bread",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Island Sweet Skunk",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Bruce Banner",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Strawberry Banana",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Headband",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Chocolope",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "XJ-13",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Candyland",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "FPOG",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Banana Kush",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Gelonade",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Crunch Berries",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Watermelon Z",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "SFV OG",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Jet Fuel",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Papaya",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Guava",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Bubble Gum",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Pink Lemonade",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Singapore Sling",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Ghost Train Haze",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Lemon Skunk",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "Strawberry OG",
+    "aliases": [],
+    "parents": [
+      "SFV OG",
+      "Bruce Banner"
+    ],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "Strawberry Lemonade",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "Snoop Dogg OG",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "Ice",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "Wedding Pie",
+    "aliases": [],
+    "parents": [
+      "Wedding Cake",
+      "Grape Pie"
+    ],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "I-95",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "Diesel Regular",
+    "aliases": [],
+    "parents": [],
+    "source_url": "",
+    "breeder": "Herbies Seeds",
+    "lineage_note": "Seed line shown in your order. Parentage has not been verified for this specific product."
+  },
+  {
+    "name": "GG#4 Original Glue Regular",
+    "aliases": [],
+    "parents": [],
+    "source_url": "",
+    "breeder": "Herbies Seeds",
+    "lineage_note": "Seed line shown in your order. Parentage has not been verified for this specific product."
+  },
+  {
+    "name": "Special Kush #1",
+    "aliases": [],
+    "parents": [],
+    "source_url": "",
+    "breeder": "Royal Queen Seeds",
+    "lineage_note": "Seed line shown in your order. Parentage has not been verified for this specific product."
+  },
+  {
+    "name": "Northern Lights 10 of 10",
+    "aliases": [],
+    "parents": [],
+    "source_url": "",
+    "breeder": "Seedkeepers",
+    "lineage_note": "Seed line shown in your order. Parentage has not been verified for this specific product."
+  },
+  {
+    "name": "Girl Scout Cookies Fast Version",
+    "aliases": [],
+    "parents": [],
+    "source_url": "",
+    "breeder": "Herbies Seeds",
+    "lineage_note": "Seed line shown in your order. Parentage has not been verified for this specific product."
+  },
+  {
+    "name": "Godfather OG",
+    "aliases": [],
+    "parents": [],
+    "source_url": "",
+    "breeder": "Herbies Seeds",
+    "lineage_note": "Seed line shown in your order. Parentage has not been verified for this specific product."
+  },
+  {
+    "name": "CBD Amnesia",
+    "aliases": [],
+    "parents": [],
+    "source_url": "",
+    "breeder": "Herbies Seeds",
+    "lineage_note": "Seed line shown in your order. Parentage has not been verified for this specific product."
+  },
+  {
+    "name": "Bruce Banner Fast Version",
+    "aliases": [],
+    "parents": [],
+    "source_url": "",
+    "breeder": "Herbies Seeds",
+    "lineage_note": "Seed line shown in your order. Parentage has not been verified for this specific product."
+  },
+  {
+    "name": "Northern Lights #10",
+    "aliases": [],
+    "parents": [],
+    "source_url": "",
+    "breeder": "Herbies Seeds",
+    "lineage_note": "Seed line shown in your order. Parentage has not been verified for this specific product."
+  },
+  {
+    "name": "Blue Lobster",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2024"
+  },
+  {
+    "name": "Zoap",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2025"
+  },
+  {
+    "name": "Cap Junky",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2024"
+  },
+  {
+    "name": "Lemon Cherry Gelato",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/runners-up-leafly-strain-of-the-year-2024"
+  },
+  {
+    "name": "Sherbanger",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/runners-up-leafly-strain-of-the-year-2024"
+  },
+  {
+    "name": "Gastropop",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/runners-up-leafly-strain-of-the-year-2024"
+  },
+  {
+    "name": "Gary Payton",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2024"
+  },
+  {
+    "name": "Glitter Bomb",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2025"
+  },
+  {
+    "name": "Gush Mints",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/leafly-strain-of-the-year-2025-nominees"
+  },
+  {
+    "name": "Dulce De Uva",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/leafly-strain-of-the-year-2025-nominees"
+  },
+  {
+    "name": "Tea Time",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2024"
+  },
+  {
+    "name": "Blueberry Cupcake",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2024"
+  },
+  {
+    "name": "Cadillac Rainbow",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2024"
+  },
+  {
+    "name": "Chimera",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2024"
+  },
+  {
+    "name": "Triple Burger",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2024"
+  },
+  {
+    "name": "Tropical Burst",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2024"
+  },
+  {
+    "name": "Blue Nerds",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2025"
+  },
+  {
+    "name": "Candy Fumez",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2025"
+  },
+  {
+    "name": "Dante’s Inferno",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2025"
+  },
+  {
+    "name": "Moroccan Peaches",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2025"
+  },
+  {
+    "name": "Gello Shotz",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2025"
+  },
+  {
+    "name": "Blueberry Caviar",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-hot-weed-strains-2025"
+  },
+  {
+    "name": "Honey Banana",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-best-weed-strains-harvest-2024"
+  },
+  {
+    "name": "Double OG Sour",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-best-weed-strains-harvest-2024"
+  },
+  {
+    "name": "Pineapple Mojito",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-best-weed-strains-harvest-2024"
+  },
+  {
+    "name": "Tropical Slushie",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/runners-up-leafly-strain-of-the-year-2024"
+  },
+  {
+    "name": "LCG Fritter",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-best-weed-strains-harvest-2024"
+  },
+  {
+    "name": "Strawberry Pop",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/12-best-weed-strains-harvest-2024"
+  },
+  {
+    "name": "Do-Si-Dos (Herbies Seeds)",
+    "aliases": [],
+    "parents": [],
+    "source_url": "",
+    "breeder": "Herbies Seeds",
+    "lineage_note": "Seed line shown in your order. Parentage has not been verified for this specific product."
+  }
+]

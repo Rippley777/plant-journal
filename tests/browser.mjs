@@ -113,7 +113,7 @@ with sqlite3.connect(sys.argv[1]) as db:
   await dialog().getByRole('button',{name:'Remove collaborator',exact:true}).click();await closed();
   await visitor.close();
   await go('/strains');
-  assert.equal(await page.locator('.strain-card').count(),52);
+  assert.equal(await page.locator('.strain-card').count(),152);
   assert.equal(await page.locator('.strain-card.is-collected').count(),0);
   await page.getByLabel('Find a strain',{exact:true}).fill('Blue Dream');
   await page.getByRole('link',{name:'Blue Dream · Not collected',exact:true}).click();
@@ -153,7 +153,7 @@ with sqlite3.connect(sys.argv[1]) as db:
   await page.getByLabel('Show cards',{exact:true}).selectOption('wanted');
   assert.equal(await page.locator('.strain-card').count(),1);
   await page.getByLabel('Show cards',{exact:true}).selectOption('all');
-  await page.screenshot({path:join(artifacts,'strain-collection-desktop.png'),fullPage:true});
+  await page.screenshot({path:join(artifacts,'strain-collection-desktop.png'),fullPage:false});
   await go('/seeds');
   await page.getByRole('button',{name:'+ Add your first seeds',exact:true}).click();
   await dialog().getByLabel('Name',{exact:true}).fill('Tomato <seed>');

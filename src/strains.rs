@@ -267,6 +267,10 @@ struct Starter {
     aliases: Vec<String>,
     parents: Vec<String>,
     source_url: String,
+    #[serde(default)]
+    breeder: String,
+    #[serde(default)]
+    lineage_note: String,
 }
 pub async fn seed_starter_collection(pool: &Database) -> anyhow::Result<()> {
     let garden = crate::auth::LEGACY_GARDEN;
@@ -279,17 +283,24 @@ pub async fn seed_starter_collection(pool: &Database) -> anyhow::Result<()> {
     .bind("ally.rippley@gmail.com")
     .fetch_one(&mut tx)
     .await?;
-    let done: i64 =
-        db::query_scalar("SELECT COUNT(*) FROM strain_catalog_imports WHERE garden_id=?")
+    let version: Option<i64> =
+        db::query_scalar("SELECT catalog_version FROM strain_catalog_imports WHERE garden_id=?")
             .bind(garden)
-            .fetch_one(&mut tx)
+            .fetch_optional(&mut tx)
             .await?;
-    if eligible == 0 || done > 0 {
+    let version = version.unwrap_or(0);
+    if eligible == 0 || version >= 2 {
         tx.commit().await?;
         return Ok(());
     }
-    let catalog: Vec<Starter> =
-        serde_json::from_str(include_str!("../resources/starter-strains.json"))?;
+    let mut catalog: Vec<Starter> = if version == 0 {
+        serde_json::from_str(include_str!("../resources/starter-strains.json"))?
+    } else {
+        Vec::new()
+    };
+    catalog.extend(serde_json::from_str::<Vec<Starter>>(include_str!(
+        "../resources/expanded-strains.json"
+    ))?);
     let existing: Vec<Strain> = db::query_as("SELECT * FROM strains WHERE garden_id=?")
         .bind(garden)
         .fetch_all(&mut tx)
@@ -305,13 +316,15 @@ pub async fn seed_starter_collection(pool: &Database) -> anyhow::Result<()> {
             continue;
         }
         let id = store::id();
-        let note = if strain.parents.is_empty() {
+        let note = if !strain.lineage_note.is_empty() {
+            strain.lineage_note.as_str()
+        } else if strain.parents.is_empty() {
             "Starter catalog record. Parentage has not been recorded here; unknown does not mean no ancestors."
         } else {
             "Reported catalog lineage, not verified for your particular seeds or cut. Edit to match your records."
         };
-        db::query("INSERT INTO strains(id,garden_id,name,name_key,species,status,lineage_note,source_url,created_at) VALUES(?,?,?,?,'Cannabis','unowned',?,?,?)")
-            .bind(&id).bind(garden).bind(&strain.name).bind(&key).bind(note).bind(&strain.source_url).bind(Utc::now().timestamp()).execute(&mut tx).await?;
+        db::query("INSERT INTO strains(id,garden_id,name,name_key,species,breeder,status,lineage_note,source_url,created_at) VALUES(?,?,?,?,'Cannabis',?,'unowned',?,?,?)")
+            .bind(&id).bind(garden).bind(&strain.name).bind(&key).bind(&strain.breeder).bind(note).bind(&strain.source_url).bind(Utc::now().timestamp()).execute(&mut tx).await?;
         inserted.insert(id.clone());
         ids.insert(key, id);
     }
@@ -321,7 +334,7 @@ pub async fn seed_starter_collection(pool: &Database) -> anyhow::Result<()> {
             let parents: Vec<_> = strain
                 .parents
                 .iter()
-                .map(|p| ids.get(&name_key(p)).expect("catalog parent"))
+                .filter_map(|p| ids.get(&name_key(p)))
                 .collect();
             db::query("UPDATE strains SET parent_one_id=?,parent_two_id=? WHERE id=?")
                 .bind(parents.first().copied())
@@ -332,6 +345,7 @@ pub async fn seed_starter_collection(pool: &Database) -> anyhow::Result<()> {
         }
     }
     let mut matches = HashMap::new();
+    let mut newly_linked = HashSet::new();
     for strain in &catalog {
         for name in std::iter::once(&strain.name).chain(strain.aliases.iter()) {
             matches.insert(name_key(name), ids[&name_key(&strain.name)].clone());
@@ -359,15 +373,22 @@ pub async fn seed_starter_collection(pool: &Database) -> anyhow::Result<()> {
                 .bind(garden)
                 .execute(&mut tx)
                 .await?;
+                newly_linked.insert(strain.clone());
             }
         }
     }
-    db::query("UPDATE strains SET status='collected' WHERE garden_id=? AND (EXISTS(SELECT 1 FROM plants p WHERE p.strain_id=strains.id) OR EXISTS(SELECT 1 FROM seeds s WHERE s.strain_id=strains.id AND s.quantity>0))")
-        .bind(garden).execute(&mut tx).await?;
-    db::query("INSERT INTO strain_catalog_imports(garden_id,imported_at) VALUES(?,?)")
-        .bind(garden)
-        .bind(Utc::now().timestamp())
-        .execute(&mut tx)
-        .await?;
+    for id in inserted.iter().chain(newly_linked.iter()) {
+        db::query("UPDATE strains SET status='collected' WHERE id=? AND garden_id=? AND (EXISTS(SELECT 1 FROM plants p WHERE p.strain_id=strains.id) OR EXISTS(SELECT 1 FROM seeds s WHERE s.strain_id=strains.id AND s.quantity>0))")
+            .bind(id).bind(garden).execute(&mut tx).await?;
+    }
+    if version == 0 {
+        db::query("INSERT INTO strain_catalog_imports(garden_id,imported_at,catalog_version) VALUES(?,?,2)")
+            .bind(garden).bind(Utc::now().timestamp()).execute(&mut tx).await?;
+    } else {
+        db::query("UPDATE strain_catalog_imports SET catalog_version=2 WHERE garden_id=?")
+            .bind(garden)
+            .execute(&mut tx)
+            .await?;
+    }
     tx.commit().await
 }

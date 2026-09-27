@@ -45,7 +45,7 @@ Application pages and APIs require a session. Use HTTPS with `secure_cookies = t
 Open **Strains** for your collectible strain cards and interactive ancestry graphs.
 Link plants and seeds to existing strains, or type a new strain name in their forms.
 Cards can be unowned, wanted, or collected; linked plants and seeds on hand unlock
-cards automatically. The original owner's garden starts with 52 common cannabis
+cards automatically. The original owner's garden starts with 152 curated cannabis
 strains and selected documented parentage. See [strain collection and lineage](docs/strains.md)
 for collection rules, sources, and database upgrade details.
 
