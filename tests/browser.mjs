@@ -60,17 +60,33 @@ with sqlite3.connect(sys.argv[1]) as db:
   const go = async path => {await page.goto(base+path);await page.locator('#content[aria-busy="false"]').waitFor();assert.equal(await page.locator('#notice.error').count(),0);};
   const closed = async () => page.locator('dialog').waitFor({state:'hidden'});
   const dialog = () => page.locator('dialog');
-  const uploadAndDelete = async () => {
+  const uploadAndDelete = async (plantName = '') => {
     await page.getByRole('button', {name:'Add photo', exact:true}).first().click();
     await dialog().getByLabel('Photo', {exact:true}).setInputFiles({name:'photo.gif', mimeType:'image/gif', buffer:Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==','base64')});
     await dialog().getByRole('button', {name:'Upload photo', exact:true}).click();await closed();
     await page.locator('.photo-card img').waitFor();
     await page.locator('.photo-card img').scrollIntoViewIfNeeded();
     await page.waitForFunction(()=>{const img=document.querySelector('.photo-card img');return img?.complete && img.naturalWidth===1;});
+    if (plantName) {
+      await go('/plants');
+      const card=page.locator('.plant-card').filter({has:page.getByRole('link',{name:plantName,exact:true})});
+      await card.locator('.plant-cover img').waitFor();
+      assert.ok(await card.locator('.plant-cover img').evaluate(img=>img.complete && img.naturalWidth===1));
+      await page.screenshot({path:join(artifacts,'plant-card-with-photo.png')});
+      await card.getByRole('link',{name:plantName,exact:true}).click();
+      await page.locator('.photo-card img').waitFor();
+    }
     await page.reload();await page.locator('.photo-card img').waitFor();
     await page.locator('.photo-card').getByRole('button', {name:'Delete',exact:true}).click();
     await dialog().getByRole('button', {name:'Delete permanently',exact:true}).click();await closed();
     await page.locator('.photo-card').waitFor({state:'hidden'});
+    if (plantName) {
+      await go('/plants');
+      const card=page.locator('.plant-card').filter({has:page.getByRole('link',{name:plantName,exact:true})});
+      assert.equal(await card.locator('.plant-cover img').count(),0);
+      assert.equal(await card.locator('.plant-art').count(),1);
+      await card.getByRole('link',{name:plantName,exact:true}).click();
+    }
   };
   await go('/settings');
   assert.equal(await page.getByLabel('Theme', {exact:true}).inputValue(), 'fieldnotes');
@@ -196,7 +212,7 @@ with sqlite3.connect(sys.argv[1]) as db:
   await page.getByRole('heading',{name:'Photo history',exact:true}).waitFor();
   await page.getByRole('heading',{name:'Ancestry',exact:true}).waitFor();
   await page.getByRole('link',{name:'◇ Browser cross',exact:true}).waitFor();
-  await uploadAndDelete();
+  await uploadAndDelete('Monstera');
   await go('/plants');
   await page.getByRole('button',{name:'+ Add a plant',exact:true}).click();
   await dialog().getByLabel('Name',{exact:true}).fill('Pothos');

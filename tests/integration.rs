@@ -667,6 +667,82 @@ async fn backup_restore_retains_database_and_photo_associations() {
     assert_eq!(photos.as_array().unwrap().len(), 1);
 }
 #[tokio::test]
+async fn plant_cards_follow_latest_linked_photo_and_fall_back_after_unlink() {
+    let (_dir, app, router) = setup().await;
+    let plant = add_plant(&router, "Card plant").await;
+    let other = add_plant(&router, "No photo").await;
+    let covers = async || {
+        let (_, plants) = request(&router, "GET", "/api/v1/plants", None).await;
+        plants
+    };
+    assert!(covers()
+        .await
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|p| p["cover_photo_id"].is_null()));
+    let first = automation::capture(&app, 1000, vec![plant.clone()], None)
+        .await
+        .unwrap()
+        .unwrap();
+    let second = automation::capture(&app, 1001, vec![plant.clone()], None)
+        .await
+        .unwrap()
+        .unwrap();
+    let plants = covers().await;
+    assert_eq!(
+        plants
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["id"] == plant)
+            .unwrap()["cover_photo_id"],
+        second
+    );
+    assert!(plants
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == other)
+        .unwrap()["cover_photo_id"]
+        .is_null());
+    assert_eq!(
+        request(
+            &router,
+            "PUT",
+            &format!("/api/v1/photos/{second}"),
+            Some(json!({"plant_ids":[]}))
+        )
+        .await
+        .0,
+        StatusCode::NO_CONTENT
+    );
+    let plants = covers().await;
+    assert_eq!(
+        plants
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["id"] == plant)
+            .unwrap()["cover_photo_id"],
+        first
+    );
+    assert_eq!(
+        request(&router, "DELETE", &format!("/api/v1/photos/{first}"), None)
+            .await
+            .0,
+        StatusCode::NO_CONTENT
+    );
+    let plants = covers().await;
+    assert!(plants
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == plant)
+        .unwrap()["cover_photo_id"]
+        .is_null());
+}
+#[tokio::test]
 async fn rejects_cross_origin_mutation_and_form_posts() {
     let (_dir, _app, router) = setup().await;
     let req = Request::builder()

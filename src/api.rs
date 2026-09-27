@@ -15,8 +15,9 @@ use axum::{
 use chrono::Utc;
 use chrono_tz::Tz;
 use serde::Deserialize;
+use serde::Serialize;
 use serde_json::{json, Value};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tower_http::trace::TraceLayer;
 
 pub(crate) type Result<T> = std::result::Result<T, ApiError>;
@@ -266,17 +267,39 @@ async fn summary(
         json!({"database_backend":app.pool.backend(),"active_plants":counts.0,"entries":counts.1,"photos":counts.2,"sensor_stale":automation::reading_stale(latest.as_ref(),Utc::now().timestamp()),"latest_reading":latest,"health":health,"hardware_connected":garden==auth::LEGACY_GARDEN && app.config.automation_enabled,"sensor_adapter":if garden==auth::LEGACY_GARDEN {app.config.sensor.adapter.as_str()}else{"disabled"},"camera_adapter":if garden==auth::LEGACY_GARDEN {app.config.camera.adapter.as_str()}else{"disabled"},"settings":store::garden_settings(&app.pool, &garden).await?}),
     ))
 }
+#[derive(Serialize)]
+struct PlantWithCover {
+    #[serde(flatten)]
+    plant: Plant,
+    cover_photo_id: Option<String>,
+}
 async fn plants(
     State(app): State<Arc<App>>,
     Extension(Garden(garden)): Extension<Garden>,
-) -> Result<Json<Vec<Plant>>> {
-    Ok(Json(
+) -> Result<Json<Vec<PlantWithCover>>> {
+    let plants: Vec<Plant> =
         db::query_as("SELECT * FROM plants WHERE garden_id=? ORDER BY archived,name COLLATE NOCASE")
             .sql_server(
                 "SELECT * FROM plants WHERE garden_id=? ORDER BY archived,name COLLATE Latin1_General_100_CI_AS_SC",
             )
             .bind(&*garden).fetch_all(&app.pool)
-            .await?,
+            .await?;
+    let photos: Vec<db::Record> = db::query_as("SELECT pp.plant_id,p.id FROM photo_plants pp JOIN photos p ON p.id=pp.photo_id WHERE p.garden_id=? ORDER BY p.captured_at DESC,p.id DESC")
+        .bind(&*garden).fetch_all(&app.pool).await?;
+    let mut covers = HashMap::new();
+    for photo in photos {
+        covers
+            .entry(photo.get::<String>("plant_id")?)
+            .or_insert(photo.get::<String>("id")?);
+    }
+    Ok(Json(
+        plants
+            .into_iter()
+            .map(|plant| PlantWithCover {
+                cover_photo_id: covers.remove(&plant.id),
+                plant,
+            })
+            .collect(),
     ))
 }
 async fn plant(
