@@ -46,8 +46,8 @@ function modal(title, contents, submit) {
 function formWrap(contents, label='Save') {return `<form class="form-grid">${contents}<div class="form-error" role="alert"></div><div class="row"><button type="submit">${label}</button><button type="button" class="secondary" data-action="close">Cancel</button></div></form>`;}
 function plantEditor(id) {
   const plant=plants.find(p=>p.id===id);
-  modal(plant?'Edit plant':'Welcome a new plant',formWrap(`<label>Name<input name="name" required maxlength="120" value="${esc(plant?.name)}" placeholder="e.g. The little monstera"></label><label>Species or variety<input name="species" maxlength="160" value="${esc(plant?.species)}" placeholder="Monstera deliciosa"></label><label>Plant notes<textarea name="notes" maxlength="10000" placeholder="Where it lives, when you brought it home, things to remember…">${esc(plant?.notes)}</textarea></label>${plant?`<label class="check-label"><input type="checkbox" name="archived" ${plant.archived?'checked':''}>Archive plant (keep its history)</label>`:''}`),async data=>{
-    await api('/plants'+(plant?'/'+plant.id:''),plant?'PUT':'POST',{name:data.get('name'),species:data.get('species'),notes:data.get('notes'),archived:data.has('archived')});notice(plant?'Plant updated.':'Your plant is ready for its first entry.');
+  modal(plant?'Edit plant':'Welcome a new plant',formWrap(`<label>Name<input name="name" required maxlength="120" value="${esc(plant?.name)}" placeholder="e.g. The little monstera"></label><label>Species or variety<input name="species" maxlength="160" value="${esc(plant?.species)}" placeholder="Monstera deliciosa"></label>${strainPicker(plant?.strain_id)}<label>Plant notes<textarea name="notes" maxlength="10000" placeholder="Where it lives, when you brought it home, things to remember…">${esc(plant?.notes)}</textarea></label>${plant?`<label class="check-label"><input type="checkbox" name="archived" ${plant.archived?'checked':''}>Archive plant (keep its history)</label>`:''}`),async data=>{
+    await api('/plants'+(plant?'/'+plant.id:''),plant?'PUT':'POST',{name:data.get('name'),species:data.get('species'),notes:data.get('notes'),archived:data.has('archived'),strain_id:await resolveStrainName(data)});notice(plant?'Plant updated.':'Your plant is ready for its first entry.');
   });
 }
 let currentSeeds = [];
@@ -57,10 +57,11 @@ function seedEditor(id) {
     <div class="grid two-col"><label>Name<input name="name" required maxlength="120" value="${esc(seed?.name)}" placeholder="e.g. Tomato"></label><label>Variety<input name="variety" maxlength="160" value="${esc(seed?.variety)}" placeholder="e.g. Cherokee Purple"></label></div>
     <div class="grid two-col"><label>Quantity on hand<input name="quantity" type="number" required min="0" max="1000000000" step="1" value="${seed?.quantity ?? 1}"></label><label>Unit<select name="unit"><option value="seeds" ${seed?.unit==='seeds'?'selected':''}>Seeds</option><option value="packets" ${(!seed || seed.unit==='packets')?'selected':''}>Packets</option></select></label></div>
     <div class="grid two-col"><label>Supplier<input name="supplier" maxlength="160" value="${esc(seed?.supplier)}"></label><label>Purchase year<input name="purchase_year" type="number" min="1900" max="2100" step="1" value="${esc(seed?.purchase_year)}"></label></div>
+    ${strainPicker(seed?.strain_id)}
     <label>Storage location<input name="storage_location" maxlength="160" value="${esc(seed?.storage_location)}" placeholder="e.g. Fridge, seed box"></label>
     <label>Notes<textarea name="notes" maxlength="10000" placeholder="Sowing instructions, germination results, or anything to remember…">${esc(seed?.notes)}</textarea></label>`), async data => {
     await api('/seeds' + (seed ? '/' + seed.id : ''), seed ? 'PUT' : 'POST', {
-      name: data.get('name'), variety: data.get('variety'), quantity: Number(data.get('quantity')),
+      strain_id: await resolveStrainName(data), name: data.get('name'), variety: data.get('variety'), quantity: Number(data.get('quantity')),
       unit: data.get('unit'), supplier: data.get('supplier'),
       purchase_year: data.get('purchase_year') ? Number(data.get('purchase_year')) : null,
       storage_location: data.get('storage_location'), notes: data.get('notes')
@@ -73,7 +74,7 @@ async function seedsPage() {
   [currentSeeds, currentPhotos] = await Promise.all([api('/seeds'), api('/photos')]);
   $('#content').innerHTML = currentSeeds.length ? `<div class="grid three-col">${currentSeeds.map(seed => `
     <article class="card card-body"><div class="row spread"><h2>${esc(seed.name)}</h2><span class="badge ${seed.quantity===0?'warn':''}">${seed.quantity===0?'Out of stock':`${seed.quantity} ${esc(seed.unit)}`}</span></div>
-    <p class="muted">${esc(seed.variety || 'No variety recorded')}</p>
+    <p class="muted">${esc(seed.variety || 'No variety recorded')}</p>${strainTags(seed.strain_id)}
     ${seed.supplier?`<p>Supplier: ${esc(seed.supplier)}</p>`:''}
     ${seed.purchase_year?`<p>Purchased: ${seed.purchase_year}</p>`:''}
     ${seed.storage_location?`<p>Stored: ${esc(seed.storage_location)}</p>`:''}
@@ -137,10 +138,10 @@ async function plantsPage() {
     heading(plant.species||'A growing story.',button('Edit plant','plant',plant.id,'secondary'));
     $('h1').textContent=plant.name;
     const [entries,photos]=await Promise.all([api('/entries?plant='+plant.id),api('/photos?plant='+plant.id)]);currentEntries=entries;currentPhotos=photos;
-    $('#content').innerHTML=`<div class="toolbar"><a href="/plants" class="muted">← All plants</a>${plant.archived?'<span class="badge warn">Archived · history retained</span>':button('+ Add an entry','entry')}</div><section class="card card-body"><h2>Plant notes</h2><p class="profile-description">${esc(plant.notes||'The story starts here.')}</p><p class="muted">Added ${esc(formatDate(plant.created_at,{year:'numeric'}))}</p></section><div class="grid two-col section-space"><section><h2>Journal</h2><div class="section-space">${journalCards(entries)}</div></section><section><div class="row spread"><h2>Photo history</h2>${button('Add photo','upload-plant',plant.id,'secondary small')}</div><div class="grid section-space">${photoCards(photos)}</div></section></div>`;return;
+    $('#content').innerHTML=`<div class="toolbar"><a href="/plants" class="muted">← All plants</a>${plant.archived?'<span class="badge warn">Archived · history retained</span>':button('+ Add an entry','entry')}</div><section class="card card-body"><h2>Plant notes</h2>${strainTags(plant.strain_id)}<p class="profile-description">${esc(plant.notes||'The story starts here.')}</p><p class="muted">Added ${esc(formatDate(plant.created_at,{year:'numeric'}))}</p></section>${plant.strain_id?lineageSection(plant.strain_id):`<section class="card card-body section-space"><h2>Strain & ancestry</h2><p class="muted">Link this plant to a strain to see its family tree and unlock its collection card.</p>${button('Link a strain','plant',plant.id,'secondary small')}</section>`}<div class="grid two-col section-space"><section><h2>Journal</h2><div class="section-space">${journalCards(entries)}</div></section><section><div class="row spread"><h2>Photo history</h2>${button('Add photo','upload-plant',plant.id,'secondary small')}</div><div class="grid section-space">${photoCards(photos)}</div></section></div>`;if(plant.strain_id)bindLineage(plant.strain_id);return;
   }
   selectedPlant='';heading('Every plant has a story. Keep yours here.',button('+ Add a plant','plant'));
-  $('#content').innerHTML=plants.length?`<div class="grid three-col">${plants.map(p=>`<article class="card plant-card ${p.archived?'archived':''}"><div class="plant-art" aria-hidden="true">♧</div><div class="card-body"><div class="row spread"><h3><a href="/plants?plant=${p.id}">${esc(p.name)}</a></h3>${p.archived?'<span class="badge">Archived</span>':''}</div><p class="muted">${esc(p.species||'A new addition')}</p><div class="row spread"><a class="muted" href="/plants?plant=${p.id}">View plant journal ↗</a>${button('Add photo','upload-plant',p.id,'secondary small')}${button('Edit','plant',p.id,'secondary small')}</div></div></article>`).join('')}</div>`:empty('Your grow space starts here','Add a plant to begin collecting notes, care, and photos.',button('+ Add your first plant','plant'));
+  $('#content').innerHTML=plants.length?`<div class="grid three-col">${plants.map(p=>`<article class="card plant-card ${p.archived?'archived':''}"><div class="plant-art" aria-hidden="true">♧</div><div class="card-body"><div class="row spread"><h3><a href="/plants?plant=${p.id}">${esc(p.name)}</a></h3>${p.archived?'<span class="badge">Archived</span>':''}</div><p class="muted">${esc(p.species||'A new addition')}</p>${strainTags(p.strain_id)}<div class="row spread"><a class="muted" href="/plants?plant=${p.id}">View plant journal ↗</a>${button('Add photo','upload-plant',p.id,'secondary small')}${button('Edit','plant',p.id,'secondary small')}</div></div></article>`).join('')}</div>`:empty('Your grow space starts here','Add a plant to begin collecting notes, care, and photos.',button('+ Add your first plant','plant'));
 }
 function journalCards(entries) {return entries.length?entries.map(e=>`<article class="card journal-entry"><div class="row spread"><span class="badge">${icons[e.kind]||'·'} ${esc(e.kind)}</span><span class="muted">${esc(formatTime(e.occurred_at))}</span></div><p class="entry-text">${esc(e.body)}</p>${badges(e.plant_ids)}<div class="row section-space">${button('Edit','entry',e.id,'secondary small')}${button('Delete','delete-entry',e.id,'secondary small')}</div></article>`).join(''):empty('A fresh page','Write down what you notice, or record a little care.',button('Add an entry','entry','','secondary'));}
 async function journalPage() {
@@ -225,11 +226,11 @@ async function settingsPage() {
   });
 }
 async function load() {
-  [plants,summary]=await Promise.all([api('/plants'),api('/summary')]);
+  [plants,summary,strains]=await Promise.all([api('/plants'),api('/summary'),api('/strains')]);
   $('#storage-note').textContent=summary.database_backend==='azure_sql'?'Azure SQL journal · Local photos':'Local journal · Local photos';
   if(!month)month=dateKey(Date.now()/1000).slice(0,7);
   $('#today').textContent=formatDate(Date.now()/1000,{weekday:'long',year:'numeric'});
-  await ({dashboard,plants:plantsPage,seeds:seedsPage,journal:journalPage,calendar:calendarPage,photos:photosPage,environment:environmentPage,equipment:equipmentPage,settings:settingsPage}[page] || dashboard)();
+  await ({dashboard,plants:plantsPage,seeds:seedsPage,strains:strainsPage,journal:journalPage,calendar:calendarPage,photos:photosPage,environment:environmentPage,equipment:equipmentPage,settings:settingsPage}[page] || dashboard)();
   $('#content').setAttribute('aria-busy','false');
 }
 async function run(fn) {try{await fn();}catch(error){notice(error.message,true);$('#content').setAttribute('aria-busy','false');}}
@@ -245,6 +246,11 @@ document.addEventListener('click',event=>{
     if(action==='upload-plant')uploadPhoto('plant',id);
     if(action==='upload-seed')uploadPhoto('seed',id);
     if(action==='seed')seedEditor(id);
+    if(action==='strain')strainEditor(id);
+    if(action==='collect-strain')await setStrainStatus(id,'collected');
+    if(action==='want-strain')await setStrainStatus(id,'wanted');
+    if(action==='unwant-strain')await setStrainStatus(id,'unowned');
+    if(action==='delete-strain')deleteStrain(id);
     if(action==='delete-seed')deleteSeed(id);
     if(action==='entry')entryEditor(id);
     if(action==='photo-links')photoEditor(id);

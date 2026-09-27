@@ -112,6 +112,48 @@ with sqlite3.connect(sys.argv[1]) as db:
   await page.getByRole('button',{name:'Remove',exact:true}).click();
   await dialog().getByRole('button',{name:'Remove collaborator',exact:true}).click();await closed();
   await visitor.close();
+  await go('/strains');
+  assert.equal(await page.locator('.strain-card').count(),52);
+  assert.equal(await page.locator('.strain-card.is-collected').count(),0);
+  await page.getByLabel('Find a strain',{exact:true}).fill('Blue Dream');
+  await page.getByRole('link',{name:'Blue Dream · Not collected',exact:true}).click();
+  await page.getByRole('heading',{name:'Ancestry',exact:true}).waitFor();
+  assert.equal(await page.locator('.lineage-node').count(),3);
+  await page.getByRole('button',{name:'♡ Add to wishlist',exact:true}).click();
+  await page.getByText('Wishlist updated.',{exact:true}).waitFor();
+  await page.reload();await page.locator('#content[aria-busy="false"]').waitFor();
+  await page.getByRole('link',{name:'Blue Dream · Wanted',exact:true}).waitFor();
+  await page.getByRole('button',{name:'✦ Mark collected',exact:true}).click();
+  await page.getByText('Strain collected. Your card is unlocked.',{exact:true}).waitFor();
+  assert.equal(await page.locator('.strain-card.is-collected').count(),1);
+  await go('/strains');
+  await page.getByRole('button',{name:'+ Add a strain',exact:true}).click();
+  await dialog().getByLabel('Strain name',{exact:true}).fill('Browser cross');
+  await dialog().getByLabel('Species',{exact:true}).fill('Test plant');
+  await dialog().getByLabel('Collection status',{exact:true}).selectOption('wanted');
+  await dialog().getByLabel('Parent 1',{exact:true}).selectOption({label:'Blue Dream'});
+  await dialog().getByLabel('Parent 2',{exact:true}).selectOption({label:'Gelato'});
+  await dialog().getByRole('button',{name:'Save strain',exact:true}).click();await closed();
+  await page.getByLabel('Find a strain',{exact:true}).fill('Browser cross');
+  await page.getByRole('link',{name:'Browser cross · Wanted',exact:true}).click();
+  await page.getByRole('heading',{name:'Ancestry',exact:true}).waitFor();
+  await page.getByLabel('Generations',{exact:true}).selectOption('3');
+  assert.ok(await page.locator('.lineage-node').count()>=7);
+  await page.getByRole('button',{name:'Zoom in ancestry',exact:true}).click();
+  await page.getByRole('button',{name:'Fit graph',exact:true}).click();
+  await page.screenshot({path:join(artifacts,'strain-ancestry-desktop.png'),fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Ancestry detail overflows mobile');
+  await page.getByRole('button',{name:'Fit graph',exact:true}).click();
+  await page.screenshot({path:join(artifacts,'strain-ancestry-mobile.png'),fullPage:true});
+  await page.setViewportSize({width:1440,height:1050});
+  await page.getByRole('link',{name:'Explore Blue Dream ancestry',exact:true}).click();
+  await page.locator('h1').filter({hasText:'Blue Dream'}).waitFor();
+  await go('/strains');
+  await page.getByLabel('Show cards',{exact:true}).selectOption('wanted');
+  assert.equal(await page.locator('.strain-card').count(),1);
+  await page.getByLabel('Show cards',{exact:true}).selectOption('all');
+  await page.screenshot({path:join(artifacts,'strain-collection-desktop.png'),fullPage:true});
   await go('/seeds');
   await page.getByRole('button',{name:'+ Add your first seeds',exact:true}).click();
   await dialog().getByLabel('Name',{exact:true}).fill('Tomato <seed>');
@@ -121,9 +163,11 @@ with sqlite3.connect(sys.argv[1]) as db:
   await dialog().getByLabel('Purchase year').fill('2026');
   await dialog().getByLabel('Storage location').fill('Fridge');
   await dialog().getByLabel('Notes',{exact:true}).fill('Sow indoors.');
+  await dialog().getByLabel('Strain',{exact:true}).fill('Typed browser strain');
   await dialog().getByRole('button',{name:'Save',exact:true}).click();await closed();
   await page.getByRole('heading',{name:'Tomato <seed>',exact:true}).waitFor();
   await page.getByText('3 packets',{exact:true}).waitFor();
+  await page.getByRole('link',{name:'◇ Typed browser strain',exact:true}).waitFor();
   await uploadAndDelete();
   await page.getByRole('button',{name:'Edit',exact:true}).click();
   await dialog().getByLabel('Quantity on hand').fill('0');
@@ -145,10 +189,13 @@ with sqlite3.connect(sys.argv[1]) as db:
   await page.getByRole('button',{name:'+ Add your first plant',exact:true}).click();
   await dialog().getByLabel('Name',{exact:true}).fill('Monstera');
   await dialog().getByLabel('Species or variety').fill('Monstera deliciosa');
+  await dialog().getByLabel('Strain',{exact:true}).fill('Browser cross');
   await dialog().getByLabel('Plant notes').fill('New leaves near the grow light.');
   await dialog().getByRole('button',{name:'Save',exact:true}).click();await closed();
   await page.getByRole('link',{name:'Monstera',exact:true}).click();
   await page.getByRole('heading',{name:'Photo history',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Ancestry',exact:true}).waitFor();
+  await page.getByRole('link',{name:'◇ Browser cross',exact:true}).waitFor();
   await uploadAndDelete();
   await go('/plants');
   await page.getByRole('button',{name:'+ Add a plant',exact:true}).click();
@@ -209,7 +256,7 @@ with sqlite3.connect(sys.argv[1]) as db:
   await go('/');
   await page.screenshot({path:join(artifacts,'overview-desktop.png'),fullPage:true});
   await page.setViewportSize({width:390,height:844});
-  for(const path of ['/','/plants','/journal','/calendar','/photos','/environment','/equipment','/settings']) {
+  for(const path of ['/','/plants','/strains','/journal','/calendar','/photos','/environment','/equipment','/settings']) {
     await go(path);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,`Mobile overflow on ${path}`);
   }
@@ -218,12 +265,12 @@ with sqlite3.connect(sys.argv[1]) as db:
   await page.getByLabel('Theme', {exact:true}).selectOption('arcade');
   for (const width of [1440,390]) {
     await page.setViewportSize({width,height:width===390?844:1050});
-    for (const path of ['/','/plants','/seeds','/journal','/calendar','/photos','/environment','/equipment','/settings']) {
+    for (const path of ['/','/plants','/seeds','/strains','/journal','/calendar','/photos','/environment','/equipment','/settings']) {
       await go(path);
       assert.equal(await page.locator('html').getAttribute('data-theme'), 'arcade');
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Night Arcade overflow at ${width}px on ${path}`);
-      if (['/','/settings','/calendar','/environment'].includes(path)) {
-        await page.screenshot({path:join(artifacts,`arcade-${path.slice(1)||'overview'}-${width}.png`),fullPage:true});
+      if (['/','/strains','/settings','/calendar','/environment'].includes(path)) {
+        await page.screenshot({path:join(artifacts,`arcade-${path.slice(1)||'overview'}-${width}.png`),fullPage:path!=='/strains'});
       }
     }
   }

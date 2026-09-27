@@ -174,7 +174,7 @@ Before deploying the version with seed inventory, run the new binary with
 (as in the setup instructions above). This applies `0002_seed_inventory.sql`,
 adds the `seeds` table, and retains existing journal data. It is safe to rerun:
 applied versions are recorded in `dbo.journal_schema`. The cloud runtime keeps
-`database.migrate = false` and the current application requires version 4 at startup. Stop older application instances
+`database.migrate = false` and the current application requires version 5 at startup. Stop older application instances
 before the multi-user upgrade; they do not enforce garden isolation.
 
 SQLite applies this migration automatically on startup. SQLite imports include
@@ -202,10 +202,30 @@ image requests check garden membership.
 Back up first, stop older web and Pi instances, run the new binary with `--migrate`
 using the migration identity, then activate the owner with `--set-password
 ally.rippley@gmail.com` in an interactive terminal using the same database config.
-Start only the upgraded binaries. The runtime requires schema version 4 even when
+Start only the upgraded binaries. The runtime requires schema version 5 even when
 `database.migrate = false`. See [account operations](accounts.md).
 
 The legacy SQLite importer supports journals with just the original account and
 garden, plus older journals without accounts. It refuses sources or destinations
 with additional accounts/gardens. Use full database backup/restore for multi-user
 installations; do not flatten them into one account through the legacy importer.
+
+
+## Strain collection and ancestry (schema version 5)
+
+Run the new binary with `--migrate` before starting it with `database.migrate = false`.
+Migration `0005_strains.sql` adds garden-scoped strain records and optional strain
+links to plants and seeds. Existing records remain intact. SQLite applies the same
+upgrade automatically on startup. Both backends enforce garden ownership on strain
+links; the API serializes parent edits and rejects ancestry loops.
+
+On the first application startup after migration, the original garden owned by
+`ally.rippley@gmail.com` receives the [52-card starter collection](strains.md).
+Matching existing inventory unlocks cards; this import runs once and never resets
+later edits or deleted cards. Other gardens start empty.
+
+Single-garden SQLite imports preserve strain records, parent links, collection
+status, plant/seed links, and the starter-import marker. Older sources without
+strains are supported. Import into a schema-only destination using `--migrate`
+and `--import-sqlite` **before starting the web app**: the app's starter collection
+counts as existing data, and the importer deliberately refuses nonempty destinations.

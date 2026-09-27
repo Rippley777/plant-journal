@@ -7,6 +7,7 @@ pub mod database;
 pub mod import;
 pub mod models;
 pub mod store;
+pub mod strains;
 
 use adapters::{Camera, Sensor, Switch};
 use config::Config;
@@ -29,6 +30,7 @@ impl App {
         tokio::fs::create_dir_all(config.data_dir.join("photos")).await?;
         let pool =
             Database::open(&config.database, &config.data_dir.join("journal.sqlite3")).await?;
+        strains::seed_starter_collection(&pool).await?;
         Ok(Arc::new(Self {
             sensor: adapters::sensor(&config.sensor)?,
             camera: adapters::camera(&config.camera)?,

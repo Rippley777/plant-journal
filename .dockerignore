@@ -16,6 +16,8 @@
 !templates/**
 !migrations/
 !migrations/**
+!resources/
+!resources/**
 !tests/
 tests/**
 !tests/*.rs

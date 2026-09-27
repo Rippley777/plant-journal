@@ -1,0 +1,367 @@
+[
+  {
+    "name": "ACDC",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Afghani",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "AK-47",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Animal Mints",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Apple Fritter",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Biscotti",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Blue Dream",
+    "aliases": [],
+    "parents": [
+      "Blueberry",
+      "Haze"
+    ],
+    "source_url": "https://www.leafly.com/strains/blue-dream"
+  },
+  {
+    "name": "Blueberry",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Bubba Kush",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Chemdog",
+    "aliases": [
+      "Chemdawg"
+    ],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Cherry Pie",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Do-Si-Dos",
+    "aliases": [
+      "Dosidos",
+      "Do Si Dos"
+    ],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Durban Poison",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Forbidden Fruit",
+    "aliases": [],
+    "parents": [
+      "Tangie",
+      "Cherry Pie"
+    ],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Gelato",
+    "aliases": [],
+    "parents": [
+      "Sunset Sherbet",
+      "Thin Mint GSC"
+    ],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "Gelato #33",
+    "aliases": [
+      "Gelato 33"
+    ],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "GG4",
+    "aliases": [
+      "Original Glue",
+      "Gorilla Glue",
+      "Gorilla Glue #4"
+    ],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Granddaddy Purple",
+    "aliases": [
+      "GDP",
+      "Grand Daddy Purple"
+    ],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Grape Ape",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Green Crack",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "GSC",
+    "aliases": [
+      "Girl Scout Cookies"
+    ],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Harlequin",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Haze",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Hindu Kush",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Ice Cream Cake",
+    "aliases": [],
+    "parents": [
+      "Wedding Cake",
+      "Gelato #33"
+    ],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "Jack Herer",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Kush Mints",
+    "aliases": [],
+    "parents": [
+      "Animal Mints",
+      "Bubba Kush"
+    ],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "MAC",
+    "aliases": [
+      "Miracle Alien Cookies"
+    ],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Mimosa",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Northern Lights",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "OG Kush",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Peanut Butter Breath",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Permanent Marker",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Pineapple Express",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Pink Panties",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "Purple Kush",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Purple Punch",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Runtz",
+    "aliases": [],
+    "parents": [
+      "The Original Z",
+      "Gelato"
+    ],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "Skunk #1",
+    "aliases": [
+      "Skunk 1"
+    ],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Sour Diesel",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Strawberry Cough",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Sunset Sherbet",
+    "aliases": [
+      "Sherbet",
+      "Sherbert",
+      "Sunset Sherbert"
+    ],
+    "parents": [
+      "GSC",
+      "Pink Panties"
+    ],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "Super Boof",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "Super Lemon Haze",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Super Silver Haze",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Tangie",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "The Original Z",
+    "aliases": [
+      "Zkittlez",
+      "Z"
+    ],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "Thin Mint GSC",
+    "aliases": [
+      "Thin Mint Girl Scout Cookies"
+    ],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "Trainwreck",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Triangle Kush",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  },
+  {
+    "name": "Wedding Cake",
+    "aliases": [],
+    "parents": [
+      "Triangle Kush",
+      "Animal Mints"
+    ],
+    "source_url": "https://www.leafly.com/news/strains-products/best-selling-weed-strains"
+  },
+  {
+    "name": "White Widow",
+    "aliases": [],
+    "parents": [],
+    "source_url": "https://www.leafly.com/news/strains-products/top-100-marijuana-strains"
+  }
+]

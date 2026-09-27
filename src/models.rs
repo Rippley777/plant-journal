@@ -6,6 +6,8 @@ pub struct Plant {
     pub id: String,
     pub name: String,
     pub species: String,
+    #[serde(default)]
+    pub strain_id: Option<String>,
     pub notes: String,
     pub archived: bool,
     pub created_at: i64,
@@ -16,6 +18,8 @@ pub struct PlantInput {
     pub name: String,
     #[serde(default)]
     pub species: String,
+    #[serde(default)]
+    pub strain_id: Option<String>,
     #[serde(default)]
     pub notes: String,
     #[serde(default)]
@@ -139,6 +143,7 @@ record!(Plant {
     id,
     name,
     species,
+    strain_id,
     notes,
     archived,
     created_at
@@ -191,6 +196,8 @@ pub struct Seed {
     pub id: String,
     pub name: String,
     pub variety: String,
+    #[serde(default)]
+    pub strain_id: Option<String>,
     pub quantity: i64,
     pub unit: String,
     pub supplier: String,
@@ -205,6 +212,8 @@ pub struct SeedInput {
     pub name: String,
     #[serde(default)]
     pub variety: String,
+    #[serde(default)]
+    pub strain_id: Option<String>,
     pub quantity: i64,
     pub unit: String,
     #[serde(default)]
@@ -219,6 +228,7 @@ record!(Seed {
     id,
     name,
     variety,
+    strain_id,
     quantity,
     unit,
     supplier,

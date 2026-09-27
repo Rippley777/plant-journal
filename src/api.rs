@@ -19,13 +19,13 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
 
-type Result<T> = std::result::Result<T, ApiError>;
+pub(crate) type Result<T> = std::result::Result<T, ApiError>;
 pub struct ApiError(StatusCode, String);
 impl ApiError {
-    fn bad(message: impl Into<String>) -> Self {
+    pub(crate) fn bad(message: impl Into<String>) -> Self {
         Self(StatusCode::BAD_REQUEST, message.into())
     }
-    fn missing() -> Self {
+    pub(crate) fn missing() -> Self {
         Self(StatusCode::NOT_FOUND, "Record not found".into())
     }
 }
@@ -64,6 +64,7 @@ fn render(page: &str) -> Response {
         "dashboard" => "Overview",
         "plants" => "Your plants",
         "seeds" => "Seed inventory",
+        "strains" => "Strain collection",
         "journal" => "Journal",
         "calendar" => "Calendar",
         "photos" => "Photo journal",
@@ -121,6 +122,9 @@ pub fn router(app: Arc<App>) -> Router {
                 )
             }),
         )
+        .route("/api/v1/strains", get(crate::strains::list).post(crate::strains::create))
+        .route("/api/v1/strains/{id}", axum::routing::put(crate::strains::update).delete(crate::strains::delete))
+        .route("/assets/strains.js", get(|| async { ([(header::CONTENT_TYPE,"text/javascript; charset=utf-8")],include_str!("../static/strains.js")) }))
         .route("/api/v1/summary", get(summary))
         .route("/api/v1/seeds", get(seeds).post(create_seed))
         .route("/api/v1/seeds/{id}", axum::routing::put(update_seed).delete(delete_seed))
@@ -216,7 +220,7 @@ async fn same_origin(req: Request<Body>, next: Next) -> Response {
         .insert(header::CACHE_CONTROL, "no-store".parse().unwrap());
     response
 }
-fn text(value: &str, label: &str, max: usize) -> Result<()> {
+pub(crate) fn text(value: &str, label: &str, max: usize) -> Result<()> {
     if value.trim().is_empty() || value.len() > max {
         return Err(ApiError::bad(format!(
             "{label} must contain 1–{max} characters"
@@ -305,14 +309,16 @@ async fn create_plant(
     let id = store::id();
     let now = Utc::now().timestamp();
     let mut tx = app.pool.begin().await?;
-    db::query("INSERT INTO plants(id,name,species,notes,archived,created_at,garden_id) VALUES(?,?,?,?,?,?,?)")
+    crate::strains::lock_garden(&mut tx, &garden).await?;
+    crate::strains::link(&mut tx, &garden, input.strain_id.as_deref(), true).await?;
+    db::query("INSERT INTO plants(id,name,species,notes,archived,created_at,garden_id,strain_id) VALUES(?,?,?,?,?,?,?,?)")
         .bind(&id)
         .bind(input.name.trim())
         .bind(&input.species)
         .bind(&input.notes)
         .bind(input.archived)
         .bind(now)
-        .bind(&*garden).execute(&mut tx)
+        .bind(&*garden).bind(&input.strain_id).execute(&mut tx)
         .await?;
     store::garden_event(
         &mut tx,
@@ -342,11 +348,14 @@ async fn update_plant(
         .await?
         .ok_or_else(ApiError::missing)?;
     let mut tx = app.pool.begin().await?;
-    db::query("UPDATE plants SET name=?,species=?,notes=?,archived=? WHERE id=? AND garden_id=?")
+    crate::strains::lock_garden(&mut tx, &garden).await?;
+    crate::strains::link(&mut tx, &garden, input.strain_id.as_deref(), true).await?;
+    db::query("UPDATE plants SET name=?,species=?,notes=?,archived=?,strain_id=? WHERE id=? AND garden_id=?")
         .bind(input.name.trim())
         .bind(&input.species)
         .bind(&input.notes)
         .bind(input.archived)
+        .bind(&input.strain_id)
         .bind(&id)
         .bind(&*garden)
         .execute(&mut tx)
@@ -1209,10 +1218,20 @@ async fn create_seed(
 ) -> Result<(StatusCode, Json<Value>)> {
     check_seed(&input)?;
     let id = store::id();
-    db::query("INSERT INTO seeds(id,name,variety,quantity,unit,supplier,purchase_year,storage_location,notes,created_at,garden_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+    let mut tx = app.pool.begin().await?;
+    crate::strains::lock_garden(&mut tx, &garden).await?;
+    crate::strains::link(
+        &mut tx,
+        &garden,
+        input.strain_id.as_deref(),
+        input.quantity > 0,
+    )
+    .await?;
+    db::query("INSERT INTO seeds(id,name,variety,quantity,unit,supplier,purchase_year,storage_location,notes,created_at,garden_id,strain_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
         .bind(&id).bind(input.name.trim()).bind(&input.variety).bind(input.quantity).bind(&input.unit)
         .bind(&input.supplier).bind(input.purchase_year).bind(&input.storage_location).bind(&input.notes)
-        .bind(Utc::now().timestamp()).bind(&*garden).execute(&app.pool).await?;
+        .bind(Utc::now().timestamp()).bind(&*garden).bind(&input.strain_id).execute(&mut tx).await?;
+    tx.commit().await?;
     Ok((StatusCode::CREATED, Json(json!({"id":id}))))
 }
 async fn update_seed(
@@ -1222,13 +1241,23 @@ async fn update_seed(
     Json(input): Json<SeedInput>,
 ) -> Result<StatusCode> {
     check_seed(&input)?;
-    let result = db::query("UPDATE seeds SET name=?,variety=?,quantity=?,unit=?,supplier=?,purchase_year=?,storage_location=?,notes=? WHERE id=? AND garden_id=?")
+    let mut tx = app.pool.begin().await?;
+    crate::strains::lock_garden(&mut tx, &garden).await?;
+    crate::strains::link(
+        &mut tx,
+        &garden,
+        input.strain_id.as_deref(),
+        input.quantity > 0,
+    )
+    .await?;
+    let result = db::query("UPDATE seeds SET name=?,variety=?,quantity=?,unit=?,supplier=?,purchase_year=?,storage_location=?,notes=?,strain_id=? WHERE id=? AND garden_id=?")
         .bind(input.name.trim()).bind(&input.variety).bind(input.quantity).bind(&input.unit)
         .bind(&input.supplier).bind(input.purchase_year).bind(&input.storage_location).bind(&input.notes)
-        .bind(&id).bind(&*garden).execute(&app.pool).await?;
+        .bind(&input.strain_id).bind(&id).bind(&*garden).execute(&mut tx).await?;
     if result.rows_affected() == 0 {
         return Err(ApiError::missing());
     }
+    tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
 async fn delete_seed(

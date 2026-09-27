@@ -5,11 +5,13 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::{collections::BTreeMap, path::Path};
 
 const TABLES: &[(&str, &str)] = &[
+    ("strains", "id,garden_id,name,name_key,species,breeder,notes,status,lineage_note,source_url,created_at"),
+    ("strain_catalog_imports", "garden_id,imported_at"),
     (
         "seeds",
-        "id,name,variety,quantity,unit,supplier,purchase_year,storage_location,notes,created_at",
+        "id,name,variety,quantity,unit,supplier,purchase_year,storage_location,notes,created_at,strain_id",
     ),
-    ("plants", "id,name,species,notes,archived,created_at"),
+    ("plants", "id,name,species,notes,archived,created_at,strain_id"),
     ("entries", "id,kind,body,occurred_at,created_at"),
     ("photos", "id,filename,captured_at,source"),
     ("readings", "recorded_at,temperature_c,humidity_percent"),
@@ -81,7 +83,10 @@ pub async fn sqlite_to_database(
     let mut counts = BTreeMap::new();
     for (table, columns) in TABLES {
         // Older read-only source journals predate seed inventory or seed photos.
-        if matches!(*table, "seeds" | "photo_seeds") {
+        if matches!(
+            *table,
+            "seeds" | "photo_seeds" | "strains" | "strain_catalog_imports"
+        ) {
             let exists: i64 = sqlx::query_scalar(
                 "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
             )
@@ -93,10 +98,21 @@ pub async fn sqlite_to_database(
                 continue;
             }
         }
+        let mut selected_columns = columns.to_string();
+        if matches!(*table, "plants" | "seeds") {
+            let has_strain: i64 = sqlx::query_scalar(&format!(
+                "SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name='strain_id'"
+            ))
+            .fetch_one(&mut *snapshot)
+            .await?;
+            if has_strain == 0 {
+                selected_columns = selected_columns.replace("strain_id", "NULL AS strain_id");
+            }
+        }
         let source_sql = if *table == "settings" && has_gardens > 0 {
             "SELECT 1 AS id,timezone,photo_enabled,photo_time FROM garden_settings".to_string()
         } else {
-            format!("SELECT {columns} FROM {table}")
+            format!("SELECT {selected_columns} FROM {table}")
         };
         let raw = sqlx::query(&source_sql).fetch_all(&mut *snapshot).await?;
         let records: Vec<Record> = raw
@@ -123,6 +139,21 @@ pub async fn sqlite_to_database(
             })?;
         }
         counts.insert(table.to_string(), count);
+    }
+    // Restore edges after all nodes exist; catalog order is not a topological order.
+    if counts.get("strains").copied().unwrap_or(0) > 0 {
+        let rows = sqlx::query("SELECT id,parent_one_id,parent_two_id FROM strains")
+            .fetch_all(&mut *snapshot)
+            .await?;
+        for row in rows {
+            let row = db::sqlite_row(row)?;
+            db::query("UPDATE strains SET parent_one_id=?,parent_two_id=? WHERE id=?")
+                .bind(row.get::<Option<String>>("parent_one_id")?)
+                .bind(row.get::<Option<String>>("parent_two_id")?)
+                .bind(row.get::<String>("id")?)
+                .execute(&mut tx)
+                .await?;
+        }
     }
     // A migrated installation must not immediately operate physical equipment.
     db::query("UPDATE schedules SET enabled=0")

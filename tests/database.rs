@@ -18,6 +18,24 @@ async fn fixture() -> (TempDir, std::sync::Arc<App>) {
     .unwrap();
     (dir, app)
 }
+// The CLI import destination is schema-only (it has never opened the web app).
+// Reproduce that state in this isolated fixture without discarding real journals.
+async fn import_destination() -> (TempDir, std::sync::Arc<App>) {
+    let (dir, app) = fixture().await;
+    db::query("UPDATE strains SET parent_one_id=NULL,parent_two_id=NULL")
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    db::query("DELETE FROM strains")
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    db::query("DELETE FROM strain_catalog_imports")
+        .execute(&app.pool)
+        .await
+        .unwrap();
+    (dir, app)
+}
 #[test]
 fn sql_server_parameters_preserve_quotes_identifiers_and_comments() {
     let sql="SELECT ?, N'what? O''Brien', [odd?]]name], \"quoted?\" -- ?\n/* ? /* nested ? */ ? */ WHERE id=?";
@@ -101,7 +119,8 @@ async fn seed(app: &App) {
 async fn import_preserves_history_links_and_claims_but_disables_automation() {
     let (source_dir, source) = fixture().await;
     seed(&source).await;
-    let (_destination_dir, destination) = fixture().await;
+    db::query("UPDATE plants SET strain_id=(SELECT id FROM strains WHERE name='Blue Dream') WHERE id='plant'").execute(&source.pool).await.unwrap();
+    let (_destination_dir, destination) = import_destination().await;
     let counts = import::sqlite_to_database(
         &source_dir.path().join("journal.sqlite3"),
         &destination.pool,
@@ -109,6 +128,9 @@ async fn import_preserves_history_links_and_claims_but_disables_automation() {
     .await
     .unwrap();
     assert_eq!(counts["plants"], 1);
+    assert_eq!(counts["strains"], 52);
+    let lineage: String = db::query_scalar("SELECT p.name FROM strains s JOIN strains p ON p.id=s.parent_one_id WHERE s.name='Blue Dream'").fetch_one(&destination.pool).await.unwrap();
+    assert_eq!(lineage, "Blueberry");
     assert_eq!(counts["photo_plants"], 1);
     assert_eq!(counts["entry_plants"], 1);
     assert_eq!(counts["readings"], 1);
@@ -117,6 +139,12 @@ async fn import_preserves_history_links_and_claims_but_disables_automation() {
         .await
         .unwrap();
     assert!(p.archived);
+    let imported_strain: String = db::query_scalar("SELECT name FROM strains WHERE id=?")
+        .bind(p.strain_id)
+        .fetch_one(&destination.pool)
+        .await
+        .unwrap();
+    assert_eq!(imported_strain, "Blue Dream");
     assert_eq!(p.created_at, 1000);
     let settings: Settings =
         db::query_as("SELECT timezone,photo_enabled,photo_time FROM garden_settings")
@@ -168,7 +196,7 @@ async fn import_preserves_history_links_and_claims_but_disables_automation() {
 async fn failed_import_rolls_back_all_preceding_tables() {
     let (source_dir, source) = fixture().await;
     seed(&source).await;
-    let (_destination_dir, destination) = fixture().await;
+    let (_destination_dir, destination) = import_destination().await;
     db::query("CREATE TRIGGER reject_import BEFORE INSERT ON entry_plants BEGIN SELECT RAISE(ABORT,'injected import failure'); END;").execute(&destination.pool).await.unwrap();
     assert!(import::sqlite_to_database(
         &source_dir.path().join("journal.sqlite3"),
@@ -177,7 +205,14 @@ async fn failed_import_rolls_back_all_preceding_tables() {
     .await
     .is_err());
     for table in [
-        "plants", "entries", "photos", "devices", "events", "readings",
+        "plants",
+        "entries",
+        "photos",
+        "devices",
+        "events",
+        "readings",
+        "strains",
+        "strain_catalog_imports",
     ] {
         let count: i64 = db::query_scalar(&format!("SELECT COUNT(*) FROM {table}"))
             .fetch_one(&destination.pool)
@@ -307,7 +342,7 @@ fn connectivity_cli_requires_exported_environment_and_never_creates_data() {
 #[tokio::test]
 async fn seed_inventory_import_and_legacy_sources() {
     let (source_dir, source) = fixture().await;
-    let (_dest_dir, dest) = fixture().await;
+    let (_dest_dir, dest) = import_destination().await;
     db::query("INSERT INTO seeds(id,name,variety,quantity,unit,purchase_year,created_at) VALUES('seed','Tomato','Purple',3,'packets',2026,1000)").execute(&source.pool).await.unwrap();
     db::query("INSERT INTO photos(id,filename,captured_at,source) VALUES('photo','photo.png',1000,'upload')").execute(&source.pool).await.unwrap();
     db::query("INSERT INTO photo_seeds(photo_id,seed_id) VALUES('photo','seed')")
@@ -338,7 +373,7 @@ async fn seed_inventory_import_and_legacy_sources() {
         .execute(&source.pool)
         .await
         .unwrap();
-    let (_legacy_dest_dir, legacy_dest) = fixture().await;
+    let (_legacy_dest_dir, legacy_dest) = import_destination().await;
     let counts = import::sqlite_to_database(
         &source_dir.path().join("journal.sqlite3"),
         &legacy_dest.pool,

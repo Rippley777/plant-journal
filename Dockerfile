@@ -7,6 +7,7 @@ COPY src/ src/
 COPY static/ static/
 COPY templates/ templates/
 COPY migrations/ migrations/
+COPY resources/ resources/
 COPY tests/ tests/
 COPY deploy/config.cloud.toml deploy/config.cloud.toml
 RUN cargo test --locked && cargo build --locked --release --bin plant-journal

@@ -80,6 +80,35 @@ async fn azure_sql_end_to_end_contract() {
     assert_eq!(count, 0, "Use an empty test database");
     common::session(&app).await;
     let router = api::router(app.clone());
+    let (status, cards) = request(&router, "GET", "/api/v1/strains", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(cards.as_array().unwrap().len(), 52);
+    let parent = cards
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["name"] == "Blue Dream")
+        .unwrap()["id"]
+        .as_str()
+        .unwrap();
+    let (status, cross) = request(
+        &router,
+        "POST",
+        "/api/v1/strains",
+        Some(json!({"name":"Azure test line","status":"wanted","parent_one_id":parent})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{cross}");
+    let strain_id = cross["id"].as_str().unwrap();
+    let (status, _) = request(
+        &router,
+        "PUT",
+        &format!("/api/v1/strains/{parent}"),
+        Some(json!({"name":"Blue Dream","status":"unowned","parent_one_id":strain_id})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
     let seed = json!({"name":"Tomato 🌱","variety":"O'Brien","quantity":2,"unit":"packets","purchase_year":2026});
     let (status, created) = request(&router, "POST", "/api/v1/seeds", Some(seed.clone())).await;
     assert_eq!(status, StatusCode::CREATED, "{created}");
@@ -103,11 +132,22 @@ async fn azure_sql_end_to_end_contract() {
         &router,
         "POST",
         "/api/v1/plants",
-        Some(json!({"name":"O'Brien's fern 🌿"})),
+        Some(json!({"name":"O'Brien's fern 🌿","strain_id":strain_id})),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "{plant}");
     let id = plant["id"].as_str().unwrap();
+    let (_, cards) = request(&router, "GET", "/api/v1/strains", None).await;
+    assert_eq!(
+        cards
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["id"] == strain_id)
+            .unwrap()["status"],
+        "collected"
+    );
+
     let (status,entry)=request(&router,"POST","/api/v1/entries",Some(json!({"kind":"watering","body":"Confirmed manually","occurred_at":Utc::now().timestamp(),"plant_ids":[id,id]}))).await;
     assert_eq!(status, StatusCode::CREATED, "{entry}");
     let (status,_)=request(&router,"PUT",&format!("/api/v1/entries/{}",entry["id"].as_str().unwrap()),Some(json!({"kind":"note","body":"Edited entry","occurred_at":Utc::now().timestamp(),"plant_ids":[id]}))).await;
