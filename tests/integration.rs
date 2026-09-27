@@ -103,6 +103,7 @@ async fn pages_and_assets_are_served_without_external_dependencies() {
         "/settings",
         "/assets/app.css",
         "/assets/app.js",
+        "/assets/theme.js",
     ] {
         let (status, body) = request(&router, "GET", path, None).await;
         assert_eq!(status, StatusCode::OK, "{path}: {body}");

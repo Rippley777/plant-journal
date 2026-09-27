@@ -42,6 +42,8 @@ Application pages and APIs require a session. Use HTTPS with `secure_cookies = t
 - Local Shelly RPC and simulated outlets, daily on/off windows, overnight schedules, timed overrides, and **Resume schedule**.
 - UTC storage, configurable IANA timezone, persistent execution records, component health, and structured service logs.
 
+Choose **Settings → Appearance → Theme** to switch between the default **Fieldnotes** look and **Night Arcade**, a dark gamer-inspired theme. Changes apply instantly and are remembered in this browser across gardens and visits, including the sign-in page.
+
 All automation starts disabled. Settings initially use `America/Chicago` and a noon photo time. Choose a photo time during your lights-on window. Camera capture never switches the grow light on automatically.
 
 ## Raspberry Pi installation

@@ -112,6 +112,15 @@ pub fn router(app: Arc<App>) -> Router {
             }),
         )
          .route("/assets/favicon.svg", get(|| async { ([(header::CONTENT_TYPE,"image/svg+xml")], r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#355a43"/><path d="M32 52V22M32 38C9 39 11 13 11 13S36 12 32 38M32 29C32 10 55 10 55 10S56 31 32 29" fill="none" stroke="#e7ecdf" stroke-width="4"/></svg>"##) }))
+        .route(
+            "/assets/theme.js",
+            get(|| async {
+                (
+                    [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
+                    include_str!("../static/theme.js"),
+                )
+            }),
+        )
         .route("/api/v1/summary", get(summary))
         .route("/api/v1/seeds", get(seeds).post(create_seed))
         .route("/api/v1/seeds/{id}", axum::routing::put(update_seed).delete(delete_seed))

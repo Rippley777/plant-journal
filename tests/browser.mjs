@@ -51,7 +51,8 @@ try {
   execFileSync('python3',['-c',`import sqlite3,hashlib,sys,time
 with sqlite3.connect(sys.argv[1]) as db:
  db.execute("INSERT INTO sessions(token_hash,user_id,garden_id,expires_at) VALUES(?,?,?,?)",(hashlib.sha256(sys.argv[2].encode()).hexdigest(),"00000000-0000-0000-0000-000000000002","00000000-0000-0000-0000-000000000001",int(time.time())+3600))`,join(folder,'data','journal.sqlite3'),token]);
-  const page = await browser.newPage({viewport:{width:1440,height:1050}});
+  const context = await browser.newContext({viewport:{width:1440,height:1050}});
+  const page = await context.newPage();
   await page.context().addCookies([{name:'plant_session',value:token,url:base,httpOnly:true,sameSite:'Lax'}]);
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
@@ -72,6 +73,33 @@ with sqlite3.connect(sys.argv[1]) as db:
     await page.locator('.photo-card').waitFor({state:'hidden'});
   };
   await go('/settings');
+  assert.equal(await page.getByLabel('Theme', {exact:true}).inputValue(), 'fieldnotes');
+  const defaultPaper = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
+  await page.getByLabel('Theme', {exact:true}).selectOption('arcade');
+  assert.equal(await page.locator('html').getAttribute('data-theme'), 'arcade');
+  assert.notEqual(await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor), defaultPaper);
+  await page.reload();await page.locator('#content[aria-busy="false"]').waitFor();
+  assert.equal(await page.getByLabel('Theme', {exact:true}).inputValue(), 'arcade');
+  const themeTab = await page.context().newPage();
+  await themeTab.goto(base+'/login');
+  assert.equal(await themeTab.locator('html').getAttribute('data-theme'), 'arcade');
+  await page.getByLabel('Theme', {exact:true}).selectOption('fieldnotes');
+  await themeTab.waitForFunction(() => document.documentElement.dataset.theme === 'fieldnotes');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor), defaultPaper);
+  await page.evaluate(() => localStorage.setItem('fieldnotes.theme', 'unknown-theme'));
+  await page.reload();await page.locator('#content[aria-busy="false"]').waitFor();
+  assert.equal(await page.getByLabel('Theme', {exact:true}).inputValue(), 'fieldnotes');
+  await themeTab.close();
+  // Storage restrictions must not prevent switching the current page's theme.
+  await page.evaluate(() => {
+    window.originalSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = () => {throw new DOMException('Storage blocked', 'SecurityError');};
+  });
+  await page.getByLabel('Theme', {exact:true}).selectOption('arcade');
+  assert.equal(await page.locator('html').getAttribute('data-theme'), 'arcade');
+  await page.getByText('Theme applied for this page. Browser storage is unavailable, so it could not be saved.').waitFor();
+  await page.evaluate(() => {Storage.prototype.setItem = window.originalSetItem;delete window.originalSetItem;});
+  await page.getByLabel('Theme', {exact:true}).selectOption('fieldnotes');
   await page.getByRole('button',{name:'Add collaborator',exact:true}).click();
   await dialog().getByLabel('Account email').fill('browser@example.com');
   await dialog().getByRole('button',{name:'Add collaborator',exact:true}).click();await closed();
@@ -186,6 +214,19 @@ with sqlite3.connect(sys.argv[1]) as db:
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,`Mobile overflow on ${path}`);
   }
   await go('/calendar');await page.screenshot({path:join(artifacts,'calendar-mobile.png'),fullPage:true});
+  await go('/settings');
+  await page.getByLabel('Theme', {exact:true}).selectOption('arcade');
+  for (const width of [1440,390]) {
+    await page.setViewportSize({width,height:width===390?844:1050});
+    for (const path of ['/','/plants','/seeds','/journal','/calendar','/photos','/environment','/equipment','/settings']) {
+      await go(path);
+      assert.equal(await page.locator('html').getAttribute('data-theme'), 'arcade');
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Night Arcade overflow at ${width}px on ${path}`);
+      if (['/','/settings','/calendar','/environment'].includes(path)) {
+        await page.screenshot({path:join(artifacts,`arcade-${path.slice(1)||'overview'}-${width}.png`),fullPage:true});
+      }
+    }
+  }
   await go('/plants');
   await page.locator('.plant-card').filter({has:page.getByRole('link',{name:'Monstera',exact:true})}).getByRole('button',{name:'Edit',exact:true}).click();
   await dialog().getByLabel('Archive plant (keep its history)').check();
