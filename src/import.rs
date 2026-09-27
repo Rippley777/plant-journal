@@ -24,6 +24,7 @@ const TABLES: &[(&str, &str)] = &[
     ("health", "component,last_success,last_error,checked_at"),
     ("entry_plants", "entry_id,plant_id"),
     ("photo_plants", "photo_id,plant_id"),
+    ("photo_seeds", "photo_id,seed_id"),
     ("event_plants", "event_id,plant_id"),
     ("settings", "id,timezone,photo_enabled,photo_time"),
 ];
@@ -42,6 +43,31 @@ pub async fn sqlite_to_database(
     if matches!(destination, Database::Azure(_)) {
         db::query("DECLARE @result int; EXEC @result=sys.sp_getapplock @Resource=N'plant-journal-import',@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=15000; IF @result<0 THROW 50002,'Could not acquire import lock',1;").execute(&mut tx).await?;
     }
+    // The legacy importer never flattens multiple users/gardens into one owner.
+    let has_gardens: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='gardens'",
+    )
+    .fetch_one(&mut *snapshot)
+    .await?;
+    if has_gardens > 0 {
+        let gardens: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM gardens")
+            .fetch_one(&mut *snapshot)
+            .await?;
+        let users: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+            .fetch_one(&mut *snapshot)
+            .await?;
+        anyhow::ensure!(gardens == 1 && users == 1, "Multi-user imports require a full backup/restore; the legacy importer will not merge accounts");
+    }
+    let gardens: i64 = db::query_scalar("SELECT COUNT(*) FROM gardens")
+        .fetch_one(&mut tx)
+        .await?;
+    let users: i64 = db::query_scalar("SELECT COUNT(*) FROM users")
+        .fetch_one(&mut tx)
+        .await?;
+    anyhow::ensure!(
+        gardens == 1 && users == 1,
+        "Destination has additional accounts or gardens; import refused"
+    );
     // Do not merge two journals or overwrite existing data. The initial settings row is the sole exception.
     for (table, _) in TABLES.iter().filter(|(table, _)| *table != "settings") {
         let count: i64 = db::query_scalar(&format!("SELECT COUNT(*) FROM {table}"))
@@ -54,11 +80,12 @@ pub async fn sqlite_to_database(
     }
     let mut counts = BTreeMap::new();
     for (table, columns) in TABLES {
-        // Older read-only source journals predate seed inventory.
-        if *table == "seeds" {
+        // Older read-only source journals predate seed inventory or seed photos.
+        if matches!(*table, "seeds" | "photo_seeds") {
             let exists: i64 = sqlx::query_scalar(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='seeds'",
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
             )
+            .bind(*table)
             .fetch_one(&mut *snapshot)
             .await?;
             if exists == 0 {
@@ -66,9 +93,12 @@ pub async fn sqlite_to_database(
                 continue;
             }
         }
-        let raw = sqlx::query(&format!("SELECT {columns} FROM {table}"))
-            .fetch_all(&mut *snapshot)
-            .await?;
+        let source_sql = if *table == "settings" && has_gardens > 0 {
+            "SELECT 1 AS id,timezone,photo_enabled,photo_time FROM garden_settings".to_string()
+        } else {
+            format!("SELECT {columns} FROM {table}")
+        };
+        let raw = sqlx::query(&source_sql).fetch_all(&mut *snapshot).await?;
         let records: Vec<Record> = raw
             .into_iter()
             .map(db::sqlite_row)
@@ -107,6 +137,7 @@ pub async fn sqlite_to_database(
     )
     .execute(&mut tx)
     .await?;
+    db::query("UPDATE garden_settings SET timezone=(SELECT timezone FROM settings WHERE id=1),photo_time=(SELECT photo_time FROM settings WHERE id=1),photo_enabled=0 WHERE garden_id=?").bind(crate::auth::LEGACY_GARDEN).execute(&mut tx).await?;
     tx.commit().await.context("Import commit could not be confirmed. Inspect destination row counts before attempting another import; do not clear the source.")?;
     snapshot.commit().await?;
     source.close().await;

@@ -1,4 +1,5 @@
 //! Opt-in real-backend contract test. Never uses the production journal.
+mod common;
 use axum::{
     body::Body,
     http::{Request, StatusCode},
@@ -22,6 +23,7 @@ async fn request(
     body: Option<Value>,
 ) -> (StatusCode, Value) {
     let mut request = Request::builder()
+        .header("cookie", common::COOKIE)
         .method(method)
         .uri(path)
         .header("host", "localhost");
@@ -76,6 +78,7 @@ async fn azure_sql_end_to_end_contract() {
         .await
         .unwrap();
     assert_eq!(count, 0, "Use an empty test database");
+    common::session(&app).await;
     let router = api::router(app.clone());
     let seed = json!({"name":"Tomato 🌱","variety":"O'Brien","quantity":2,"unit":"packets","purchase_year":2026});
     let (status, created) = request(&router, "POST", "/api/v1/seeds", Some(seed.clone())).await;

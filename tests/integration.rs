@@ -1,3 +1,4 @@
+mod common;
 use async_trait::async_trait;
 use axum::{
     body::Body,
@@ -27,6 +28,7 @@ async fn setup() -> (TempDir, Arc<App>, Router) {
         ..Config::default()
     };
     let app = App::open(config).await.unwrap();
+    common::session(&app).await;
     let router = api::router(app.clone());
     (dir, app, router)
 }
@@ -37,6 +39,7 @@ async fn request(
     body: Option<Value>,
 ) -> (StatusCode, Value) {
     let mut req = Request::builder()
+        .header("cookie", common::COOKIE)
         .method(method)
         .uri(path)
         .header("host", "localhost");
@@ -144,6 +147,7 @@ async fn journal_links_edit_archive_and_restart_preserve_history() {
     })
     .await
     .unwrap();
+    common::session(&reopened).await;
     let router = api::router(reopened);
     let (_, plant) = request(&router, "GET", &format!("/api/v1/plants/{a}"), None).await;
     assert_eq!(plant["archived"], true);
@@ -646,6 +650,7 @@ async fn backup_restore_retains_database_and_photo_associations() {
     })
     .await
     .unwrap();
+    common::session(&app).await;
     let router = api::router(app);
     let (status, _) = request(&router, "GET", &format!("/api/v1/photos/{id}/image"), None).await;
     assert_eq!(status, StatusCode::OK);
@@ -662,6 +667,7 @@ async fn backup_restore_retains_database_and_photo_associations() {
 async fn rejects_cross_origin_mutation_and_form_posts() {
     let (_dir, _app, router) = setup().await;
     let req = Request::builder()
+        .header("cookie", common::COOKIE)
         .method("POST")
         .uri("/api/v1/plants")
         .header("host", "localhost")
@@ -674,6 +680,7 @@ async fn rejects_cross_origin_mutation_and_form_posts() {
         StatusCode::FORBIDDEN
     );
     let req = Request::builder()
+        .header("cookie", common::COOKIE)
         .method("POST")
         .uri("/api/v1/plants")
         .header("host", "localhost")
@@ -838,6 +845,7 @@ async fn cloud_configuration_serves_journal_without_hardware_workers_or_commands
     assert!(app.sensor.is_none());
     assert!(app.camera.is_none());
     assert!(automation::spawn(app.clone()).is_empty());
+    common::session(&app).await;
     let router = api::router(app.clone());
     let (status, _) = request(&router, "GET", "/healthz", None).await;
     assert_eq!(status, StatusCode::OK);
@@ -856,9 +864,9 @@ async fn cloud_configuration_serves_journal_without_hardware_workers_or_commands
         Some(json!({"on":true})),
     )
     .await;
-    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(status, StatusCode::NOT_FOUND);
     let (status, _) = request(&router, "DELETE", "/api/v1/overrides/outlet", None).await;
-    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(status, StatusCode::NOT_FOUND);
     let (status, _) = request(
         &router,
         "PUT",
@@ -866,7 +874,7 @@ async fn cloud_configuration_serves_journal_without_hardware_workers_or_commands
         Some(json!({"device_id":"outlet","enabled":true,"start_time":"08:00","end_time":"20:00"})),
     )
     .await;
-    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(status, StatusCode::NOT_FOUND);
     let count: i64 = db::query_scalar("SELECT COUNT(*) FROM overrides")
         .fetch_one(&app.pool)
         .await
@@ -925,6 +933,7 @@ async fn seed_inventory_persists_validates_and_deletes() {
     })
     .await
     .unwrap();
+    common::session(&reopened).await;
     let router = api::router(reopened);
     let saved = request(&router, "GET", "/api/v1/seeds", None).await.1;
     assert_eq!(saved[0]["quantity"], 0);
@@ -945,4 +954,124 @@ async fn seed_inventory_persists_validates_and_deletes() {
         request(&router, "GET", "/api/v1/seeds", None).await.1,
         json!([])
     );
+}
+
+#[tokio::test]
+async fn manual_photos_link_serve_filter_and_delete_without_camera() {
+    let (_dir, app, router) = setup().await;
+    let plant = add_plant(&router, "Photo plant").await;
+    let (_, seed) = request(
+        &router,
+        "POST",
+        "/api/v1/seeds",
+        Some(json!({
+            "name":"Photo seeds", "quantity":1, "unit":"packets"
+        })),
+    )
+    .await;
+    let seed = seed["id"].as_str().unwrap();
+    // A complete 1x1 GIF, uploaded as raw file bytes just like the browser.
+    let gif = b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff\x21\xf9\x04\x01\x00\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00\x3b";
+    // Exercise the upload route above the normal 64 KB API request limit.
+    let mut gif = gif.to_vec();
+    gif.resize(70 * 1024, 0);
+    for (kind, owner) in [("plant", plant.as_str()), ("seed", seed)] {
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .header("cookie", common::COOKIE)
+                    .method("POST")
+                    .uri(format!("/api/v1/photos/upload?{kind}={owner}"))
+                    .header("host", "localhost")
+                    .header("content-type", "application/octet-stream")
+                    .body(Body::from(gif.to_vec()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let value: Value =
+            serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+        let id = value["id"].as_str().unwrap();
+        let (_, photos) = request(
+            &router,
+            "GET",
+            &format!("/api/v1/photos?{kind}={owner}"),
+            None,
+        )
+        .await;
+        assert_eq!(photos.as_array().unwrap().len(), 1);
+        assert_eq!(photos[0][format!("{kind}_ids")][0], owner);
+        assert_eq!(photos[0]["source"], "upload");
+        let image = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .header("cookie", common::COOKIE)
+                    .uri(format!("/api/v1/photos/{id}/image"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(image.headers()["content-type"], "image/gif");
+        assert_eq!(
+            &image.into_body().collect().await.unwrap().to_bytes()[..],
+            gif
+        );
+        let filename = photos[0]["filename"].as_str().unwrap();
+        assert!(app.config.data_dir.join("photos").join(filename).exists());
+        assert_eq!(
+            request(&router, "DELETE", &format!("/api/v1/photos/{id}"), None)
+                .await
+                .0,
+            StatusCode::NO_CONTENT
+        );
+        assert!(!app.config.data_dir.join("photos").join(filename).exists());
+        let (_, photos) = request(
+            &router,
+            "GET",
+            &format!("/api/v1/photos?{kind}={owner}"),
+            None,
+        )
+        .await;
+        assert_eq!(photos, json!([]));
+    }
+    for (query, bytes, status) in [
+        (
+            format!("plant={plant}"),
+            b"not an image".to_vec(),
+            StatusCode::BAD_REQUEST,
+        ),
+        (String::new(), gif.to_vec(), StatusCode::BAD_REQUEST),
+        (
+            format!("plant={plant}&seed={seed}"),
+            gif.to_vec(),
+            StatusCode::BAD_REQUEST,
+        ),
+        ("seed=missing".into(), gif.to_vec(), StatusCode::NOT_FOUND),
+        (
+            format!("plant={plant}"),
+            vec![0; 10 * 1024 * 1024 + 1],
+            StatusCode::PAYLOAD_TOO_LARGE,
+        ),
+    ] {
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .header("cookie", common::COOKIE)
+                    .method("POST")
+                    .uri(format!("/api/v1/photos/upload?{query}"))
+                    .header("host", "localhost")
+                    .header("content-type", "application/octet-stream")
+                    .body(Body::from(bytes))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), status);
+    }
 }

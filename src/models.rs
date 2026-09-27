@@ -40,6 +40,7 @@ pub struct EntryInput {
 }
 #[derive(Serialize)]
 pub struct Photo {
+    pub seed_ids: Vec<String>,
     pub id: String,
     pub filename: String,
     pub captured_at: i64,
@@ -143,7 +144,7 @@ record!(Plant {
     created_at
 });
 record!(Entry {id,kind,body,occurred_at,created_at}; plant_ids);
-record!(Photo {id,filename,captured_at,source}; plant_ids);
+record!(Photo {id,filename,captured_at,source}; plant_ids, seed_ids);
 record!(Reading {
     recorded_at,
     temperature_c,

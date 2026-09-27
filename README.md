@@ -10,7 +10,7 @@ Requires Rust **1.86 or newer** and a C compiler. This quick start uses offline 
 cargo run --locked
 ```
 
-Open **http://127.0.0.1:3000**. This starts with simulated sensor readings and a clearly labeled simulated camera. Add plants, write an entry, capture a photo, and try a simulated light or fan in Equipment. No example plants or journal records are inserted automatically. Sensor samples arrive once a minute; equipment is checked about every ten seconds.
+Open **http://127.0.0.1:3000** to sign in or create an account. Each account starts with a private garden; owners can add registered collaborators in Settings. No example plants or journal records are inserted automatically. Local simulated hardware belongs to the original garden; new gardens start with equipment records only. See [account setup and migration](docs/accounts.md) to activate the original owner account.
 
 In this offline mode, the SQLite database and photos are created in `data/`. Assets and templates are compiled into the binary. Do not run multiple service instances against the same data directory.
 
@@ -25,14 +25,18 @@ cp config.example.toml config.toml
 PLANT_CONFIG=config.toml cargo run --locked
 ```
 
-Use `bind = "0.0.0.0:3000"` to open the app from a phone at `http://<computer-or-pi-address>:3000`. This version assumes one owner on a trusted LAN and has no login; do not expose it through router port forwarding. Mutating API requests require JSON and reject cross-origin browser requests.
+Application pages and APIs require a session. Use HTTPS with `secure_cookies = true` (the default) for hosted access. The example development configuration uses `secure_cookies = false` for local HTTP. Mutating API requests require JSON (or binary photo uploads) and reject cross-origin browser requests. [Account setup](docs/accounts.md) covers owner activation, recovery, collaboration, and MVP limits.
 
 ## What is included
+
+- Public email/password signup, login/logout, garden selection, and owner-managed collaborators.
+- Garden isolation for journal records, photos, equipment, schedules, and settings.
 
 - Plant profiles, notes, species/variety, and archival that preserves history.
 - Seed inventory with varieties, quantities in seeds or packets, supplier, purchase year, storage location, and notes. Add, edit, and delete stock from **Seeds**; zero quantity keeps an out-of-stock record.
 - Dated notes, watering, feeding, pruning, and repotting entries linked to one or several plants; edit and delete support.
 - Month calendar with selected-day details and plant/event filters. Shared environment and equipment events appear under **All plants**; a plant filter shows explicitly linked events.
+- **Add photo** on any plant or seed record uploads a JPEG, PNG, GIF, or WebP file up to 10 MB without a camera. Plant uploads appear in their photo history; seed uploads appear on their inventory card. All uploads also appear in the photo journal and calendar. Deleting a seed retains its photos in the photo journal.
 - Daily grow-space photos and **Capture now**, with editable plant associations and explicit deletion. Daily/manual captures initially link to all active plants. A single image is shared by all its plant links.
 - Temperature and humidity charts (24 hours, 7 days, or 30 days), daily calendar averages, adapter labels, and stale-reading indicators.
 - Local Shelly RPC and simulated outlets, daily on/off windows, overnight schedules, timed overrides, and **Resume schedule**.
@@ -135,7 +139,7 @@ Leave the sPlant kit on its own timer. The matching LCD kit's manual describes o
 - On restart, current intended state is reconciled; missed transitions are never replayed. At daylight-saving changes, switching follows current local wall time.
 - A daily photo is attempted only during its configured minute. A missed minute, including a nonexistent DST time, is skipped. A persistent claim allows at most one scheduled attempt per local date, even if the clock goes backward or the process restarts. Failed attempts require **Capture now** or the following day's run; they do not retry automatically. Changing timezone does not erase previous date claims.
 - Sensor polling, photos, and equipment control use independent tasks. Camera errors do not stop schedules. Component failures are recorded on change rather than once per polling cycle.
-- No data migration steps are needed for a new installation. Embedded backend-specific migrations run automatically at startup unless Azure migrations are explicitly disabled. Back up before upgrading.
+- Back up and stop older application instances before the multi-user upgrade; older binaries do not enforce garden isolation. New SQLite installations apply embedded migrations automatically. Embedded backend-specific migrations run automatically at startup unless Azure migrations are explicitly disabled. Back up before upgrading.
 
 ## Backup and restore
 
@@ -182,7 +186,8 @@ All endpoints are under `/api/v1`. Mutations use JSON; timestamps are Unix secon
 | `GET, POST /entries` | Optional `?plant=id`; create `{kind,body,occurred_at,plant_ids}` |
 | `PUT, DELETE /entries/{id}` | Replace / delete entry and its calendar event |
 | `GET /calendar?month=YYYY-MM` | Events and daily environmental summaries; optional `plant` and `kind` |
-| `GET /photos` | Photos and plant associations; optional `plant` |
+| `GET /photos` | Photos with plant and seed associations; optional `plant` and `seed` filters |
+| `POST /photos/upload?plant={id}` or `?seed={id}` | Raw image body, `Content-Type: application/octet-stream`, maximum 10 MB; exactly one owner required |
 | `POST /photos/capture` | `{}` links active plants; `{plant_ids:[...]}` uses explicit links |
 | `PUT, DELETE /photos/{id}` | Replace `{plant_ids:[...]}` / delete record and image |
 | `GET /photos/{id}/image` | Full image; simulated images are labeled SVGs |

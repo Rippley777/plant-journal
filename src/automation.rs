@@ -174,7 +174,7 @@ pub async fn capture(
 pub async fn photo_tick(app: &App, now: DateTime<Utc>) -> anyhow::Result<()> {
     let settings = store::settings(&app.pool).await?;
     if let Some(date) = due_photo(&settings, now)? {
-        let plants: Vec<String> = db::query_scalar("SELECT id FROM plants WHERE archived=0")
+        let plants: Vec<String> = db::query_scalar("SELECT id FROM plants WHERE archived=0 AND garden_id='00000000-0000-0000-0000-000000000001'")
             .fetch_all(&app.pool)
             .await?;
         capture(app, now.timestamp(), plants, Some(&date)).await?;
@@ -184,9 +184,11 @@ pub async fn photo_tick(app: &App, now: DateTime<Utc>) -> anyhow::Result<()> {
 pub async fn reconcile(app: &App, now: DateTime<Utc>) -> anyhow::Result<()> {
     let _lock = app.control_lock.lock().await;
     let tz: Tz = store::settings(&app.pool).await?.timezone.parse()?;
-    let devices: Vec<Device> = db::query_as("SELECT * FROM devices")
-        .fetch_all(&app.pool)
-        .await?;
+    let devices: Vec<Device> = db::query_as(
+        "SELECT * FROM devices WHERE garden_id='00000000-0000-0000-0000-000000000001'",
+    )
+    .fetch_all(&app.pool)
+    .await?;
     for d in devices {
         let schedule: Schedule = db::query_as("SELECT * FROM schedules WHERE device_id=?")
             .bind(&d.id)

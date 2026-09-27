@@ -19,6 +19,8 @@
 !tests/
 tests/**
 !tests/*.rs
+!tests/common/
+!tests/common/*.rs
 !deploy/
 deploy/**
 !deploy/config.cloud.toml

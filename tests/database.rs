@@ -88,7 +88,7 @@ async fn seed(app: &App) {
         .execute(&app.pool)
         .await
         .unwrap();
-    db::query("UPDATE settings SET timezone='Europe/London',photo_enabled=1")
+    db::query("UPDATE garden_settings SET timezone='Europe/London',photo_enabled=1")
         .execute(&app.pool)
         .await
         .unwrap();
@@ -118,10 +118,11 @@ async fn import_preserves_history_links_and_claims_but_disables_automation() {
         .unwrap();
     assert!(p.archived);
     assert_eq!(p.created_at, 1000);
-    let settings: Settings = db::query_as("SELECT timezone,photo_enabled,photo_time FROM settings")
-        .fetch_one(&destination.pool)
-        .await
-        .unwrap();
+    let settings: Settings =
+        db::query_as("SELECT timezone,photo_enabled,photo_time FROM garden_settings")
+            .fetch_one(&destination.pool)
+            .await
+            .unwrap();
     assert_eq!(settings.timezone, "Europe/London");
     assert!(!settings.photo_enabled);
     let enabled: bool = db::query_scalar("SELECT enabled FROM schedules")
@@ -140,7 +141,7 @@ async fn import_preserves_history_links_and_claims_but_disables_automation() {
             .await
             .unwrap();
     assert_eq!(claim, "complete");
-    let source_setting: bool = db::query_scalar("SELECT photo_enabled FROM settings")
+    let source_setting: bool = db::query_scalar("SELECT photo_enabled FROM garden_settings")
         .fetch_one(&source.pool)
         .await
         .unwrap();
@@ -308,10 +309,16 @@ async fn seed_inventory_import_and_legacy_sources() {
     let (source_dir, source) = fixture().await;
     let (_dest_dir, dest) = fixture().await;
     db::query("INSERT INTO seeds(id,name,variety,quantity,unit,purchase_year,created_at) VALUES('seed','Tomato','Purple',3,'packets',2026,1000)").execute(&source.pool).await.unwrap();
+    db::query("INSERT INTO photos(id,filename,captured_at,source) VALUES('photo','photo.png',1000,'upload')").execute(&source.pool).await.unwrap();
+    db::query("INSERT INTO photo_seeds(photo_id,seed_id) VALUES('photo','seed')")
+        .execute(&source.pool)
+        .await
+        .unwrap();
     let counts = import::sqlite_to_database(&source_dir.path().join("journal.sqlite3"), &dest.pool)
         .await
         .unwrap();
     assert_eq!(counts["seeds"], 1);
+    assert_eq!(counts["photo_seeds"], 1);
     let seed: plant_journal::models::Seed = db::query_as("SELECT * FROM seeds")
         .fetch_one(&dest.pool)
         .await
@@ -323,6 +330,10 @@ async fn seed_inventory_import_and_legacy_sources() {
             .await
             .is_err()
     );
+    db::query("DROP TABLE photo_seeds")
+        .execute(&source.pool)
+        .await
+        .unwrap();
     db::query("DROP TABLE seeds")
         .execute(&source.pool)
         .await
@@ -335,6 +346,7 @@ async fn seed_inventory_import_and_legacy_sources() {
     .await
     .unwrap();
     assert_eq!(counts["seeds"], 0);
+    assert_eq!(counts["photo_seeds"], 0);
 }
 
 #[tokio::test]

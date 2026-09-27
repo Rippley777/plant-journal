@@ -7,13 +7,17 @@ use uuid::Uuid;
 pub fn id() -> String {
     Uuid::new_v4().to_string()
 }
-pub async fn settings(pool: &Database) -> anyhow::Result<Settings> {
-    db::query_as("SELECT timezone, photo_enabled, photo_time FROM settings WHERE id=1")
-        .fetch_one(pool)
-        .await
+pub async fn garden_settings(pool: &Database, garden: &str) -> anyhow::Result<Settings> {
+    db::query_as(
+        "SELECT timezone, photo_enabled, photo_time FROM garden_settings WHERE garden_id=?",
+    )
+    .bind(garden)
+    .fetch_one(pool)
+    .await
 }
-pub async fn event(
+pub async fn garden_event(
     tx: &mut Transaction,
+    garden: &str,
     kind: &str,
     title: &str,
     time: i64,
@@ -22,13 +26,14 @@ pub async fn event(
     plants: &[String],
 ) -> anyhow::Result<String> {
     let event_id = id();
-    db::query("INSERT INTO events(id,kind,title,occurred_at,entity_id,detail) VALUES(?,?,?,?,?,?)")
+    db::query("INSERT INTO events(id,kind,title,occurred_at,entity_id,detail,garden_id) VALUES(?,?,?,?,?,?,?)")
         .bind(&event_id)
         .bind(kind)
         .bind(title)
         .bind(time)
         .bind(entity)
         .bind(detail)
+        .bind(garden)
         .execute(&mut *tx)
         .await?;
     for plant in plants {
@@ -40,8 +45,9 @@ pub async fn event(
     }
     Ok(event_id)
 }
-pub async fn log_event(
+pub async fn garden_log_event(
     pool: &Database,
+    garden: &str,
     kind: &str,
     title: &str,
     time: i64,
@@ -49,7 +55,7 @@ pub async fn log_event(
     detail: &str,
 ) -> anyhow::Result<()> {
     let mut tx = pool.begin().await?;
-    event(&mut tx, kind, title, time, entity, detail, &[]).await?;
+    garden_event(&mut tx, garden, kind, title, time, entity, detail, &[]).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -114,17 +120,18 @@ pub fn month_bounds(month: &str, timezone: Tz) -> anyhow::Result<(i64, i64)> {
     };
     Ok((to_timestamp(start)?, to_timestamp(next)?))
 }
-pub async fn calendar(
+pub async fn garden_calendar(
     pool: &Database,
+    garden: &str,
     month: &str,
     plant: Option<&str>,
     kind: Option<&str>,
 ) -> anyhow::Result<Vec<Event>> {
-    let setting = settings(pool).await?;
+    let setting = garden_settings(pool, garden).await?;
     let tz: Tz = setting.timezone.parse()?;
     let (start, end) = month_bounds(month, tz)?;
-    let mut events: Vec<Event> = db::query_as("SELECT e.* FROM events e WHERE occurred_at>=? AND occurred_at<? AND (? IS NULL OR kind=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM event_plants p WHERE p.event_id=e.id AND p.plant_id=?)) ORDER BY occurred_at")
-        .bind(start).bind(end).bind(kind).bind(kind).bind(plant).bind(plant).fetch_all(pool).await?;
+    let mut events: Vec<Event> = db::query_as("SELECT e.* FROM events e WHERE occurred_at>=? AND occurred_at<? AND (? IS NULL OR kind=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM event_plants p WHERE p.event_id=e.id AND p.plant_id=?)) AND e.garden_id=? ORDER BY occurred_at")
+        .bind(start).bind(end).bind(kind).bind(kind).bind(plant).bind(plant).bind(garden).fetch_all(pool).await?;
     let mut links = plant_links(
         pool,
         LinkKind::Event,
@@ -135,7 +142,7 @@ pub async fn calendar(
         event.plant_ids = links.remove(&event.id).unwrap_or_default();
     }
     if plant.is_none() && (kind.is_none() || kind == Some("environment")) {
-        let readings: Vec<Reading> = db::query_as("SELECT recorded_at,temperature_c,humidity_percent FROM readings WHERE recorded_at>=? AND recorded_at<? ORDER BY recorded_at").bind(start).bind(end).fetch_all(pool).await?;
+        let readings: Vec<Reading> = db::query_as("SELECT recorded_at,temperature_c,humidity_percent FROM readings WHERE recorded_at>=? AND recorded_at<? AND garden_id=? ORDER BY recorded_at").bind(start).bind(end).bind(garden).fetch_all(pool).await?;
         let mut days: std::collections::BTreeMap<String, (i64, f64, f64, usize)> =
             std::collections::BTreeMap::new();
         for r in readings {
@@ -201,4 +208,57 @@ pub async fn plant_links(
         }
     }
     Ok(links)
+}
+
+// Local controller entry points always belong to the migrated original garden.
+pub async fn settings(pool: &Database) -> anyhow::Result<Settings> {
+    garden_settings(pool, crate::auth::LEGACY_GARDEN).await
+}
+pub async fn event(
+    tx: &mut Transaction,
+    kind: &str,
+    title: &str,
+    time: i64,
+    entity: Option<&str>,
+    detail: &str,
+    plants: &[String],
+) -> anyhow::Result<String> {
+    garden_event(
+        tx,
+        crate::auth::LEGACY_GARDEN,
+        kind,
+        title,
+        time,
+        entity,
+        detail,
+        plants,
+    )
+    .await
+}
+pub async fn log_event(
+    pool: &Database,
+    kind: &str,
+    title: &str,
+    time: i64,
+    entity: Option<&str>,
+    detail: &str,
+) -> anyhow::Result<()> {
+    garden_log_event(
+        pool,
+        crate::auth::LEGACY_GARDEN,
+        kind,
+        title,
+        time,
+        entity,
+        detail,
+    )
+    .await
+}
+pub async fn calendar(
+    pool: &Database,
+    month: &str,
+    plant: Option<&str>,
+    kind: Option<&str>,
+) -> anyhow::Result<Vec<Event>> {
+    garden_calendar(pool, crate::auth::LEGACY_GARDEN, month, plant, kind).await
 }

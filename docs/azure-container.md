@@ -89,9 +89,11 @@ environment variables in App Service (or use Key Vault references):
 | `AZURE_SQL_PASSWORD` | The user's password, supplied as a runtime secret |
 | `WEBSITES_ENABLE_APP_SERVICE_STORAGE` | `true`, for persistent `/home` storage in App Service |
 
-Configure App Service's container target port as **3000**. Configure required
-sign-in and owner-only access before exposing the site: application routes still
-assume authentication is handled by the hosting platform.
+Configure App Service's container target port as **3000** and require HTTPS.
+The application now provides public signup and session-based login, with garden
+membership checks. Keep `secure_cookies = true` (the default). If platform
+authentication is enabled, it is an additional restriction and may prevent public
+signup; it does not replace application accounts. See [account setup](accounts.md).
 
 Photos are under `/home/plant-journal/photos`. Provide persistent storage writable
 by UID/GID 10001; a host mount replaces the directory permissions from the image.
@@ -110,9 +112,9 @@ The publication script never connects to SQL or runs migrations.
 
 `automation_enabled = false` prevents this instance from spawning sensor, photo,
 or equipment workers. Sensor and camera adapters are disabled. Schedule/override
-mutations return HTTP 503 explaining that equipment control is unavailable on the
-web-only instance, rather than accepting commands that cannot run. Journal and
-history APIs remain available. Existing Pi configurations retain their default
+mutations save garden-specific records without contacting devices; the UI explains
+that remote connections are not available yet. Camera capture is unavailable on
+this instance. Journal and history APIs remain available. Existing Pi configurations retain their default
 `automation_enabled = true` behavior.
 
 This image does not add a Pi agent, photo upload protocol, or remote equipment

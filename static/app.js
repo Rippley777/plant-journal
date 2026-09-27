@@ -3,13 +3,16 @@ const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const page = document.body.dataset.page;
+let account = null, activeGarden = sessionStorage.getItem('garden_id') || '';
+const currentGarden = () => account?.gardens.find(g => g.id === activeGarden);
 let plants = [], summary = {}, currentEntries = [], currentPhotos = [], equipment = {}, calendarEvents = [];
 let selectedDay = '', month = '', selectedPlant = new URLSearchParams(location.search).get('plant') || '';
 const names = ids => ids.map(id => plants.find(p => p.id === id)?.name || 'Archived plant');
 const badges = ids => `<div class="plant-tags">${names(ids).map(n => `<span class="badge">${esc(n)}</span>`).join('')}</div>`;
 const icons = {note:'≡',watering:'♧',feeding:'◇',pruning:'✂',repotting:'♧',photo:'▧',environment:'◌',device:'⌁',failure:'!',plant:'♧',system:'◈'};
 const api = async (path, method = 'GET', body) => {
-  const response = await fetch('/api/v1' + path, {method, headers: body === undefined ? {} : {'Content-Type':'application/json'}, body:body === undefined ? undefined : JSON.stringify(body)});
+  const response = await fetch('/api/v1' + path, {method, headers: {...(activeGarden ? {'X-Garden-ID': activeGarden} : {}), ...(body === undefined ? {} : {'Content-Type':body instanceof Blob ? 'application/octet-stream' : 'application/json'})}, body:body === undefined ? undefined : body instanceof Blob ? body : JSON.stringify(body)});
+  if (response.status === 401) { sessionStorage.removeItem('garden_id'); location.assign('/login'); throw new Error('Please sign in'); }
   if (!response.ok) {
     let message = await response.text();
     try { message = JSON.parse(message).error || message; } catch (_) {}
@@ -26,7 +29,7 @@ const dateKey = timestamp => {
 const localInput = timestamp => {const d = new Date(timestamp*1000);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);};
 function notice(message, error = false) {const el=$('#notice');el.textContent=message;el.className=error?'error':'';el.hidden=false;}
 function empty(title, detail, action = '') {return `<div class="empty"><span class="sprout">♧</span><h3>${esc(title)}</h3><p>${esc(detail)}</p>${action}</div>`;}
-function button(label, action, id='', style='') {return `<button type="button" class="${style}" data-action="${action}" data-id="${esc(id)}">${label}</button>`;}
+function button(label, action, id='', style='') {if(action==='capture' && (!summary.hardware_connected || summary.camera_adapter==='disabled'))return '';return `<button type="button" class="${style}" data-action="${action}" data-id="${esc(id)}">${label}</button>`;}
 function plantOptions(selected = '', all = true) {return `${all?'<option value="">All plants</option>':''}${plants.map(p=>`<option value="${p.id}" ${p.id===selected?'selected':''}>${esc(p.name)}${p.archived?' · archived':''}</option>`).join('')}`;}
 function picker(ids = [], includeArchived = false) {const available=plants.filter(p=>includeArchived||!p.archived||ids.includes(p.id));return `<label>Linked plants</label><div class="plant-picker">${available.length?available.map(p=>`<label class="check-label"><input type="checkbox" name="plant_ids" value="${p.id}" ${ids.includes(p.id)?'checked':''}>${esc(p.name)}${p.archived?' (archived)':''}</label>`).join(''):'<span class="helper">Add a plant first to link an entry.</span>'}</div>`;}
 function timeline(events, detail = false) {return events.length?`<ul class="timeline">${events.map(e=>`<li><span class="event-icon">${icons[e.kind]||'·'}</span><div><p class="event-title">${esc(e.title)}</p>${detail?`<p class="event-detail">${esc(e.detail)}</p>${badges(e.plant_ids || [])}`:''}<div class="event-time">${esc(formatTime(e.occurred_at))} · ${esc(e.kind)}</div>${e.kind==='photo'?`<a class="muted" href="/api/v1/photos/${e.entity_id}/image" target="_blank" rel="noopener">Open photo ↗</a>`:''}</div></li>`).join('')}</ul>`:empty('A quiet day','Notes, photos, and equipment activity will appear here.');}
@@ -67,7 +70,7 @@ function seedEditor(id) {
 }
 async function seedsPage() {
   heading('What’s tucked away for your next growing season.', button('+ Add seeds', 'seed'));
-  currentSeeds = await api('/seeds');
+  [currentSeeds, currentPhotos] = await Promise.all([api('/seeds'), api('/photos')]);
   $('#content').innerHTML = currentSeeds.length ? `<div class="grid three-col">${currentSeeds.map(seed => `
     <article class="card card-body"><div class="row spread"><h2>${esc(seed.name)}</h2><span class="badge ${seed.quantity===0?'warn':''}">${seed.quantity===0?'Out of stock':`${seed.quantity} ${esc(seed.unit)}`}</span></div>
     <p class="muted">${esc(seed.variety || 'No variety recorded')}</p>
@@ -75,7 +78,7 @@ async function seedsPage() {
     ${seed.purchase_year?`<p>Purchased: ${seed.purchase_year}</p>`:''}
     ${seed.storage_location?`<p>Stored: ${esc(seed.storage_location)}</p>`:''}
     ${seed.notes?`<p class="entry-text">${esc(seed.notes)}</p>`:''}
-    <div class="row section-space">${button('Edit','seed',seed.id,'secondary small')}${button('Delete','delete-seed',seed.id,'secondary small')}</div></article>`).join('')}</div>` : empty('Your next season starts here', 'Keep track of seed packets, varieties, and what you have left.', button('+ Add your first seeds', 'seed'));
+    <div class="row section-space">${button('Add photo','upload-seed',seed.id,'secondary small')}${button('Edit','seed',seed.id,'secondary small')}${button('Delete','delete-seed',seed.id,'secondary small')}</div>${currentPhotos.some(p=>p.seed_ids.includes(seed.id))?`<div class="grid section-space">${photoCards(currentPhotos.filter(p=>p.seed_ids.includes(seed.id)))}</div>`:''}</article>`).join('')}</div>` : empty('Your next season starts here', 'Keep track of seed packets, varieties, and what you have left.', button('+ Add your first seeds', 'seed'));
 }
 function deleteSeed(id) {
   const seed = currentSeeds.find(s => s.id === id);
@@ -88,6 +91,15 @@ function entryEditor(id) {
   const entry=currentEntries.find(e=>e.id===id);const initialIds=entry?.plant_ids || (selectedPlant?[selectedPlant]:[]);
   modal(entry?'Edit journal entry':'A note from the grow space',formWrap(`<div class="grid two-col"><label>Entry type<select name="kind">${['note','watering','feeding','pruning','repotting'].map(k=>`<option ${entry?.kind===k?'selected':''} value="${k}">${k[0].toUpperCase()+k.slice(1)}</option>`).join('')}</select></label><label>When<input type="datetime-local" name="when" required value="${localInput(entry?.occurred_at || Date.now()/1000)}"></label></div><p class="helper">Enter time in this browser’s timezone. History displays in ${esc(summary.settings.timezone)}.</p>${picker(initialIds,true)}<label>Observation<textarea name="body" required maxlength="20000" placeholder="A new leaf, a little water, a change worth remembering…">${esc(entry?.body)}</textarea></label><p class="helper">Watering entries record care you confirm. The sPlant timer operates independently.</p>`),async data=>{
     await api('/entries'+(entry?'/'+entry.id:''),entry?'PUT':'POST',{kind:data.get('kind'),occurred_at:Math.floor(new Date(data.get('when')).getTime()/1000),body:data.get('body'),plant_ids:data.getAll('plant_ids')});notice('Journal entry saved.');
+  });
+}
+function uploadPhoto(kind, id) {
+  const record = (kind === 'seed' ? currentSeeds : plants).find(item => item.id === id);
+  modal(`Add photo for ${record.name}`, formWrap(`<label>Photo<input type="file" name="photo" accept="image/jpeg,image/png,image/gif,image/webp" required></label><p class="helper">JPEG, PNG, GIF, or WebP · Up to 10 MB</p>`, 'Upload photo'), async data => {
+    const file = data.get('photo');
+    if (!file.size || file.size > 10 * 1024 * 1024) throw new Error('Choose a photo up to 10 MB.');
+    await api('/photos/upload?' + new URLSearchParams({[kind]: id}), 'POST', file);
+    notice('Photo added.');
   });
 }
 function photoEditor(id) {
@@ -107,7 +119,7 @@ function deviceEditor(id) {
 function overrideEditor(id,on) {
   const device=equipment.devices.find(d=>d.id===id);
   modal(`${on?'Turn on':'Turn off'} · ${device.name}`,formWrap(`<label>Override duration (minutes)<input type="number" name="minutes" value="60" min="1" max="1440" required></label><p class="helper">When the override ends, the schedule resumes. With no enabled schedule, the outlet returns to off.</p>`,'Apply override'),async data=>{
-    await api('/overrides/'+id,'PUT',{on,minutes:Number(data.get('minutes'))});notice('Override queued. Device status refreshes on the next control cycle (about 10 seconds).');
+    await api('/overrides/'+id,'PUT',{on,minutes:Number(data.get('minutes'))});notice(summary.hardware_connected ? 'Override queued. Device status refreshes on the next control cycle (about 10 seconds).' : 'Override saved. This garden has no connected hardware yet.');
   });
 }
 function heading(subtitle, actions='') {$('#subtitle').textContent=subtitle;$('#page-actions').innerHTML=actions;}
@@ -125,10 +137,10 @@ async function plantsPage() {
     heading(plant.species||'A growing story.',button('Edit plant','plant',plant.id,'secondary'));
     $('h1').textContent=plant.name;
     const [entries,photos]=await Promise.all([api('/entries?plant='+plant.id),api('/photos?plant='+plant.id)]);currentEntries=entries;currentPhotos=photos;
-    $('#content').innerHTML=`<div class="toolbar"><a href="/plants" class="muted">← All plants</a>${plant.archived?'<span class="badge warn">Archived · history retained</span>':button('+ Add an entry','entry')}</div><section class="card card-body"><h2>Plant notes</h2><p class="profile-description">${esc(plant.notes||'The story starts here.')}</p><p class="muted">Added ${esc(formatDate(plant.created_at,{year:'numeric'}))}</p></section><div class="grid two-col section-space"><section><h2>Journal</h2><div class="section-space">${journalCards(entries)}</div></section><section><h2>Photo history</h2><div class="grid section-space">${photoCards(photos)}</div></section></div>`;return;
+    $('#content').innerHTML=`<div class="toolbar"><a href="/plants" class="muted">← All plants</a>${plant.archived?'<span class="badge warn">Archived · history retained</span>':button('+ Add an entry','entry')}</div><section class="card card-body"><h2>Plant notes</h2><p class="profile-description">${esc(plant.notes||'The story starts here.')}</p><p class="muted">Added ${esc(formatDate(plant.created_at,{year:'numeric'}))}</p></section><div class="grid two-col section-space"><section><h2>Journal</h2><div class="section-space">${journalCards(entries)}</div></section><section><div class="row spread"><h2>Photo history</h2>${button('Add photo','upload-plant',plant.id,'secondary small')}</div><div class="grid section-space">${photoCards(photos)}</div></section></div>`;return;
   }
   selectedPlant='';heading('Every plant has a story. Keep yours here.',button('+ Add a plant','plant'));
-  $('#content').innerHTML=plants.length?`<div class="grid three-col">${plants.map(p=>`<article class="card plant-card ${p.archived?'archived':''}"><div class="plant-art" aria-hidden="true">♧</div><div class="card-body"><div class="row spread"><h3><a href="/plants?plant=${p.id}">${esc(p.name)}</a></h3>${p.archived?'<span class="badge">Archived</span>':''}</div><p class="muted">${esc(p.species||'A new addition')}</p><div class="row spread"><a class="muted" href="/plants?plant=${p.id}">View plant journal ↗</a>${button('Edit','plant',p.id,'secondary small')}</div></div></article>`).join('')}</div>`:empty('Your grow space starts here','Add a plant to begin collecting notes, care, and photos.',button('+ Add your first plant','plant'));
+  $('#content').innerHTML=plants.length?`<div class="grid three-col">${plants.map(p=>`<article class="card plant-card ${p.archived?'archived':''}"><div class="plant-art" aria-hidden="true">♧</div><div class="card-body"><div class="row spread"><h3><a href="/plants?plant=${p.id}">${esc(p.name)}</a></h3>${p.archived?'<span class="badge">Archived</span>':''}</div><p class="muted">${esc(p.species||'A new addition')}</p><div class="row spread"><a class="muted" href="/plants?plant=${p.id}">View plant journal ↗</a>${button('Add photo','upload-plant',p.id,'secondary small')}${button('Edit','plant',p.id,'secondary small')}</div></div></article>`).join('')}</div>`:empty('Your grow space starts here','Add a plant to begin collecting notes, care, and photos.',button('+ Add your first plant','plant'));
 }
 function journalCards(entries) {return entries.length?entries.map(e=>`<article class="card journal-entry"><div class="row spread"><span class="badge">${icons[e.kind]||'·'} ${esc(e.kind)}</span><span class="muted">${esc(formatTime(e.occurred_at))}</span></div><p class="entry-text">${esc(e.body)}</p>${badges(e.plant_ids)}<div class="row section-space">${button('Edit','entry',e.id,'secondary small')}${button('Delete','delete-entry',e.id,'secondary small')}</div></article>`).join(''):empty('A fresh page','Write down what you notice, or record a little care.',button('Add an entry','entry','','secondary'));}
 async function journalPage() {
@@ -159,7 +171,7 @@ async function calendarGrid() {
   $('#calendar-grid').innerHTML=html;showDay(selectedDay);
 }
 function showDay(day) {selectedDay=day;$$('.day[data-id]').forEach(el=>el.classList.toggle('selected',el.dataset.id===day));$('#day-title').textContent=new Intl.DateTimeFormat('en-US',{month:'long',day:'numeric',timeZone:'UTC'}).format(new Date(day+'T12:00:00Z'));$('#day-events').innerHTML=timeline(calendarEvents.filter(e=>dateKey(e.occurred_at)===day),true);}
-function photoCards(photos) {return photos.length?photos.map(p=>`<article class="card photo-card"><a href="/api/v1/photos/${p.id}/image" target="_blank" rel="noopener"><img src="/api/v1/photos/${p.id}/image" alt="Grow space photographed ${esc(formatTime(p.captured_at))}" loading="lazy"></a><div class="card-body"><div class="row spread"><span class="muted">${esc(formatTime(p.captured_at))}</span><span class="badge">${esc(p.source)}</span></div><div class="section-space">${badges(p.plant_ids)}</div><div class="row section-space">${button('Link plants','photo-links',p.id,'secondary small')}${button('Delete','delete-photo',p.id,'secondary small')}</div></div></article>`).join(''):empty('Watch the changes unfold','Daily photos will build a visual history. You can capture a moment now.',button('Capture now','capture','','secondary'));}
+function photoCards(photos) {return photos.length?photos.map(p=>`<article class="card photo-card"><a href="/api/v1/photos/${p.id}/image" target="_blank" rel="noopener"><img src="/api/v1/photos/${p.id}/image" alt="Photo added ${esc(formatTime(p.captured_at))}" loading="lazy"></a><div class="card-body"><div class="row spread"><span class="muted">${esc(formatTime(p.captured_at))}</span><span class="badge">${esc(p.source)}</span></div><div class="section-space">${badges(p.plant_ids)}</div><div class="row section-space">${button('Link plants','photo-links',p.id,'secondary small')}${button('Delete','delete-photo',p.id,'secondary small')}</div></div></article>`).join(''):empty('Watch the changes unfold','Upload a photo from a plant or seed record, or capture one with your camera.',button('Capture now','capture','','secondary'));}
 async function photosPage() {
   heading('The changes you might otherwise miss.',button('▧ Capture now','capture'));
   currentPhotos=await api('/photos'+(selectedPlant?'?plant='+selectedPlant:''));
@@ -184,21 +196,23 @@ async function environmentPage() {
 }
 function stateBadge(d) {return `<span class="badge ${d.reported_on===null?'warn':''}">${d.reported_on===null?'Unknown':d.reported_on?'Output on':'Output off'}</span>`;}
 async function equipmentPage() {
+  if (!summary.hardware_connected) notice('Equipment records and schedules are saved for this garden. Remote hardware connections are coming later.');
   heading('Simple routines, with room to step in.',button('+ Add outlet','device'));
   equipment=await api('/devices');
   $('#content').innerHTML=`<div class="notice">The sPlant pump stays on its own timer. Outlets here control lights and fans only. Reported output state doesn’t independently confirm equipment operation.</div><div class="toolbar"><span class="muted">Commands apply on the next control cycle.</span>${button('Refresh status','refresh','','secondary small')}</div><div class="grid two-col">${equipment.devices.length?equipment.devices.map(d=>{
     const s=equipment.schedules.find(s=>s.device_id===d.id);const o=equipment.overrides.find(o=>o.device_id===d.id&&o.expires_at>Date.now()/1000);
-    return `<section class="card"><div class="card-header"><h2>${esc(d.name)}</h2><span class="badge">${esc(d.adapter)} · ${esc(d.role)}</span></div><div class="card-body"><div data-device-health="${d.id}"><div class="row spread">${stateBadge(d)}<span class="muted">Last command: ${d.commanded_on===null?'none':d.commanded_on?'on':'off'}</span></div><p class="helper">${d.checked_at?'Checked '+esc(formatTime(d.checked_at)):'Waiting for first check'}</p>${d.last_error?`<p class="form-error">${esc(d.last_error)}</p>`:''}</div>${o?`<p class="muted">Override ${o.on_state?'on':'off'} until ${esc(formatTime(o.expires_at))}</p>`:''}<div class="row section-space">${button('On…','on',d.id,'secondary small')}${button('Off…','off',d.id,'secondary small')}${button('Resume schedule','resume',d.id,'secondary small')}${button('Edit outlet','device',d.id,'secondary small')}</div><form class="device-controls stack" data-schedule="${d.id}"><label class="check-label"><input type="checkbox" name="enabled" ${s.enabled?'checked':''}>Enable daily schedule</label><div class="schedule-row"><label>On at<input type="time" name="start" value="${esc(s.start_time)}" required></label><label>Off at<input type="time" name="end" value="${esc(s.end_time)}" required></label></div><p class="helper">${esc(summary.settings.timezone)} · Overnight windows supported. Disabling a schedule leaves the outlet in its current state.</p><div class="form-error" role="alert"></div><button type="submit" class="secondary small">Save schedule</button></form></div></section>`;
+    return `<section class="card"><div class="card-header"><h2>${esc(d.name)}</h2><span class="badge">${esc(d.adapter)} · ${esc(d.role)}</span></div><div class="card-body"><div data-device-health="${d.id}"><div class="row spread">${stateBadge(d)}<span class="muted">Last command: ${d.commanded_on===null?'none':d.commanded_on?'on':'off'}</span></div><p class="helper">${d.checked_at?'Checked '+esc(formatTime(d.checked_at)):'Hardware not yet checked'}</p>${d.last_error?`<p class="form-error">${esc(d.last_error)}</p>`:''}</div>${o?`<p class="muted">Override ${o.on_state?'on':'off'} until ${esc(formatTime(o.expires_at))}</p>`:''}<div class="row section-space">${button('On…','on',d.id,'secondary small')}${button('Off…','off',d.id,'secondary small')}${button('Resume schedule','resume',d.id,'secondary small')}${button('Edit outlet','device',d.id,'secondary small')}</div><form class="device-controls stack" data-schedule="${d.id}"><label class="check-label"><input type="checkbox" name="enabled" ${s.enabled?'checked':''}>Enable daily schedule</label><div class="schedule-row"><label>On at<input type="time" name="start" value="${esc(s.start_time)}" required></label><label>Off at<input type="time" name="end" value="${esc(s.end_time)}" required></label></div><p class="helper">${esc(summary.settings.timezone)} · Overnight windows supported. Disabling a schedule leaves the outlet in its current state.</p><div class="form-error" role="alert"></div><button type="submit" class="secondary small">Save schedule</button></form></div></section>`;
   }).join(''):empty('Make a little routine','Add a simulated outlet to explore schedules before connecting equipment.',button('Add an outlet','device','','secondary'))}</div>`;
   $$('[data-schedule]').forEach(form=>form.addEventListener('submit',async event=>{
     event.preventDefault();const data=new FormData(form);const id=form.dataset.schedule;const submit=$('button[type=submit]',form);submit.disabled=true;
-    try{await api('/schedules/'+id,'PUT',{device_id:id,enabled:data.has('enabled'),start_time:data.get('start'),end_time:data.get('end')});notice('Schedule saved. It will apply on the next control cycle.');}
+    try{await api('/schedules/'+id,'PUT',{device_id:id,enabled:data.has('enabled'),start_time:data.get('start'),end_time:data.get('end')});notice(summary.hardware_connected ? 'Schedule saved. It will apply on the next control cycle.' : 'Schedule saved. Hardware connections are coming later.');}
     catch(e){$('.form-error',form).textContent=e.message;}finally{submit.disabled=false;}
   }));
 }
 async function settingsPage() {
   heading('A few things to make this space yours.');const s=summary.settings;
-  $('#content').innerHTML=`<div class="grid two-col"><section class="card"><div class="card-header"><h2>Time & daily photos</h2></div><div class="card-body"><form id="settings-form" class="form-grid"><label>Timezone<input name="timezone" value="${esc(s.timezone)}" required placeholder="America/Chicago"></label><p class="helper">Use an IANA timezone. It applies to schedules and the calendar; timestamps are stored in UTC.</p><label class="check-label"><input type="checkbox" name="photo_enabled" ${s.photo_enabled?'checked':''}>Take one photo every day</label><label>Capture time<input type="time" name="photo_time" value="${esc(s.photo_time)}" required></label><p class="helper">Choose a time when the grow lights are on. Daily photos link to all currently active plants; links can be edited later. Missed captures are skipped.</p><div class="form-error" role="alert"></div><button type="submit">Save settings</button></form></div></section><section class="card"><div class="card-header"><h2>Connections & health</h2></div><div class="card-body"><div class="health-row row spread"><span>Journal database</span><span class="badge">${summary.database_backend==='azure_sql'?'Azure SQL':'SQLite (local)'}</span></div><div class="health-row row spread"><span>Sensor</span><span class="badge">${esc(summary.sensor_adapter)}</span></div><div class="health-row row spread"><span>Camera</span><span class="badge">${esc(summary.camera_adapter)}</span></div>${summary.health.map(h=>`<div class="health-row"><div class="row spread"><span>${esc(h.component)}</span><span class="badge ${h.last_error?'error':''}">${h.last_error?'Needs attention':'Last operation succeeded'}</span></div><p class="helper">${h.last_error?esc(h.last_error):'Last success '+esc(formatTime(h.last_success))}</p></div>`).join('')}<p class="helper section-space">Hardware adapters are configured in the service’s TOML file. See the included README for Pi setup and backup/restore instructions.</p><p class="helper section-space">Single owner · ${summary.database_backend==='azure_sql'?'Azure SQL journal · Photos on this device':'Local SQLite journal'}</p></div></section></div>`;
+  $('#content').innerHTML=`<div class="grid two-col"><section class="card"><div class="card-header"><h2>Time & daily photos</h2></div><div class="card-body"><form id="settings-form" class="form-grid"><label>Timezone<input name="timezone" value="${esc(s.timezone)}" required placeholder="America/Chicago"></label><p class="helper">Use an IANA timezone. It applies to schedules and the calendar; timestamps are stored in UTC.</p><label class="check-label"><input type="checkbox" name="photo_enabled" ${!summary.hardware_connected?'disabled':''} ${s.photo_enabled?'checked':''}>Take one photo every day</label><label>Capture time<input type="time" name="photo_time" value="${esc(s.photo_time)}" required></label><p class="helper">Choose a time when the grow lights are on. Daily photos link to all currently active plants; links can be edited later. Missed captures are skipped.</p><div class="form-error" role="alert"></div><button type="submit">Save settings</button></form></div></section><section class="card"><div class="card-header"><h2>Connections & health</h2></div><div class="card-body"><div class="health-row row spread"><span>Journal database</span><span class="badge">${summary.database_backend==='azure_sql'?'Azure SQL':'SQLite (local)'}</span></div><div class="health-row row spread"><span>Sensor</span><span class="badge">${esc(summary.sensor_adapter)}</span></div><div class="health-row row spread"><span>Camera</span><span class="badge">${esc(summary.camera_adapter)}</span></div>${summary.health.map(h=>`<div class="health-row"><div class="row spread"><span>${esc(h.component)}</span><span class="badge ${h.last_error?'error':''}">${h.last_error?'Needs attention':'Last operation succeeded'}</span></div><p class="helper">${h.last_error?esc(h.last_error):'Last success '+esc(formatTime(h.last_success))}</p></div>`).join('')}<p class="helper section-space">Hardware adapters are configured in the service’s TOML file. See the included README for Pi setup and backup/restore instructions.</p><p class="helper section-space">Shared garden · ${summary.database_backend==='azure_sql'?'Azure SQL journal · Photos on this device':'Local SQLite journal'}</p></div></section></div>`;
+  await membershipPanel();
   $('#settings-form').addEventListener('submit',async event=>{
     event.preventDefault();const form=event.target;const data=new FormData(form);const submit=$('button[type=submit]',form);submit.disabled=true;
     try{await api('/settings','PUT',{timezone:data.get('timezone'),photo_enabled:data.has('photo_enabled'),photo_time:data.get('photo_time')});notice('Settings saved.');await load();}catch(e){$('.form-error',form).textContent=e.message;}finally{submit.disabled=false;}
@@ -217,7 +231,13 @@ document.addEventListener('click',event=>{
   const target=event.target.closest('[data-action]');if(!target)return;
   const {action,id}=target.dataset;
   run(async()=>{
+    if(action==='logout'){await api('/auth/logout','POST',{});sessionStorage.removeItem('garden_id');location.assign('/login');return;}
+    if(action==='new-garden')newGarden();
+    if(action==='add-member')addMember();
+    if(action==='remove-member')removeMember(id);
     if(action==='plant')plantEditor(id);
+    if(action==='upload-plant')uploadPhoto('plant',id);
+    if(action==='upload-seed')uploadPhoto('seed',id);
     if(action==='seed')seedEditor(id);
     if(action==='delete-seed')deleteSeed(id);
     if(action==='entry')entryEditor(id);
@@ -227,7 +247,7 @@ document.addEventListener('click',event=>{
     if(action==='close')$('#editor').close();
     if(action==='device')deviceEditor(id);
     if(action==='on'||action==='off')overrideEditor(id,action==='on');
-    if(action==='resume'){await api('/overrides/'+id,'DELETE');notice('Override ended. Waiting for device confirmation.');await equipmentPage();}
+    if(action==='resume'){await api('/overrides/'+id,'DELETE');notice(summary.hardware_connected ? 'Override ended. Waiting for device confirmation.' : 'Override ended. This garden has no connected hardware yet.');await equipmentPage();}
     if(action==='refresh')await load();
     if(action==='capture') {
       target.disabled=true;target.textContent='Capturing…';
@@ -240,7 +260,7 @@ document.addEventListener('click',event=>{
 });
 $('#close-dialog').addEventListener('click',()=>$('#editor').close());
 $$('[data-nav]').forEach(el=>{el.classList.toggle('active',el.dataset.nav===page);if(el.dataset.nav===page)el.setAttribute('aria-current','page');});
-run(load);
+run(async () => { await loadAccount(); await load(); });
 
 setInterval(()=>{
   if(document.hidden || $('#editor').open)return;
@@ -248,8 +268,51 @@ setInterval(()=>{
     equipment=await api('/devices');
     for(const d of equipment.devices){
       const el=$(`[data-device-health="${d.id}"]`);
-      if(el)el.innerHTML=`<div class="row spread">${stateBadge(d)}<span class="muted">Last command: ${d.commanded_on===null?'none':d.commanded_on?'on':'off'}</span></div><p class="helper">${d.checked_at?'Checked '+esc(formatTime(d.checked_at)):'Waiting for first check'}</p>${d.last_error?`<p class="form-error">${esc(d.last_error)}</p>`:''}`;
+      if(el)el.innerHTML=`<div class="row spread">${stateBadge(d)}<span class="muted">Last command: ${d.commanded_on===null?'none':d.commanded_on?'on':'off'}</span></div><p class="helper">${d.checked_at?'Checked '+esc(formatTime(d.checked_at)):'Hardware not yet checked'}</p>${d.last_error?`<p class="form-error">${esc(d.last_error)}</p>`:''}`;
     }
   });
 },15000);
-setInterval(()=>{if(!document.hidden&&!$('#editor').open&&['dashboard','environment'].includes(page))run(load);},60000);
+setInterval(()=>{if(!document.hidden&&!$('#editor').open&&['dashboard','environment'].includes(page))run(async () => { await loadAccount(); await load(); });},60000);
+
+async function loadAccount() {
+  // Fetch identity without a stale tab garden, then validate the saved selection.
+  const saved = activeGarden;
+  activeGarden = '';
+  account = await api('/auth/me');
+  activeGarden = account.gardens.some(g => g.id === saved) ? saved : account.garden_id;
+  sessionStorage.setItem('garden_id', activeGarden);
+  $('#account-email').textContent = account.email;
+  $('#garden-select').innerHTML = account.gardens.map(g => `<option value="${esc(g.id)}" ${g.id===activeGarden?'selected':''}>${esc(g.name)}${g.is_owner?' · owner':''}</option>`).join('');
+}
+$('#garden-select').addEventListener('change', event => run(async () => {
+  const id = event.target.value;
+  await api('/gardens/'+id+'/select','POST',{});
+  sessionStorage.setItem('garden_id',id);
+  location.assign('/');
+}));
+function newGarden() {
+  modal('Create a garden', formWrap('<label>Garden name<input name="name" required maxlength="120" placeholder="My balcony garden"></label>','Create garden'),async data => {
+    const garden = await api('/gardens','POST',{name:data.get('name')});
+    await api('/gardens/'+garden.id+'/select','POST',{});
+    sessionStorage.setItem('garden_id',garden.id);
+    location.assign('/');
+  });
+}
+async function membershipPanel() {
+  if (!currentGarden()?.is_owner) {
+    $('#content').insertAdjacentHTML('beforeend','<section class="card card-body section-space"><h2>Garden collaborators</h2><p>You can edit this garden and its equipment. The owner manages membership.</p></section>');
+    return;
+  }
+  const members = await api('/members');
+  $('#content').insertAdjacentHTML('beforeend',`<section class="card card-body section-space"><div class="row spread"><h2>Garden collaborators</h2>${button('Add collaborator','add-member','','secondary')}</div><p class="helper">Collaborators can edit records and equipment settings. Add someone after they have created an account. Email addresses are not verified in this MVP; confirm the account with the person before granting access.</p>${members.map(m => `<div class="health-row row spread"><span>${esc(m.email)}${m.is_owner?' · owner':''}</span>${m.is_owner?'':button('Remove','remove-member',m.id,'secondary small')}</div>`).join('')}</section>`);
+}
+function addMember() {
+  modal('Add a collaborator',formWrap('<label>Account email<input name="email" type="email" required maxlength="254"></label><p class="helper">They must have an account first. They will be able to edit records and equipment settings.</p>','Add collaborator'),async data => {
+    await api('/members','POST',{email:data.get('email')});notice('Collaborator added.');
+  });
+}
+function removeMember(id) {
+  modal('Remove collaborator?',formWrap('<p>This person will lose access to this garden. Their contributions will stay.</p>','Remove collaborator'),async () => {
+    await api('/members/'+id,'DELETE');notice('Garden access removed.');
+  });
+}

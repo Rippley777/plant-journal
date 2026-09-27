@@ -1,5 +1,6 @@
 pub mod adapters;
 pub mod api;
+pub mod auth;
 pub mod automation;
 pub mod config;
 pub mod database;

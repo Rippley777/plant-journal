@@ -5,7 +5,7 @@ import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createServer } from 'node:net';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const folder = await mkdtemp(join(tmpdir(), 'plant-journal-browser-'));
@@ -16,7 +16,7 @@ await new Promise(r => listener.listen(0, '127.0.0.1', r));
 const port = listener.address().port;
 await new Promise(r => listener.close(r));
 const config = join(folder, 'config.toml');
-await writeFile(config, `bind = "127.0.0.1:${port}"\ndata_dir = ${JSON.stringify(join(folder, 'data'))}\n`);
+await writeFile(config, `bind = "127.0.0.1:${port}"\nsecure_cookies = false\ndata_dir = ${JSON.stringify(join(folder, 'data'))}\n`);
 const server = spawn(resolve(process.env.PLANT_BINARY || 'target/debug/plant-journal'), [], {env:{...process.env,PLANT_CONFIG:config},stdio:['ignore','pipe','pipe']});
 let serverLog = '';
 server.stdout.on('data', b => serverLog += b);
@@ -29,17 +29,61 @@ try {
   for (let i=0;i<100;i++) {
     if(launchError)throw launchError;
     if(server.exitCode !== null)throw new Error(serverLog);
-    try {if((await fetch(base+'/api/v1/summary')).ok)break;}catch(_){}
+    try {if((await fetch(base+'/healthz')).ok)break;}catch(_){}
     await new Promise(r=>setTimeout(r,100));
   }
   browser = await chromium.launch({channel:'chrome',headless:true});
+  const visitor = await browser.newPage();
+  await visitor.goto(base+'/signup');
+  await visitor.getByLabel('Email',{exact:true}).fill('browser@example.com');
+  await visitor.getByLabel('Password',{exact:true}).fill('Browser testing passphrase');
+  await visitor.getByRole('button',{name:'Create account',exact:true}).click();
+  await visitor.locator('#content[aria-busy="false"]').waitFor();
+  await visitor.getByRole('button',{name:'Sign out',exact:true}).click();
+  await visitor.waitForURL(base+'/login');
+  await visitor.getByLabel('Email',{exact:true}).fill('browser@example.com');
+  await visitor.getByLabel('Password',{exact:true}).fill('Browser testing passphrase');
+  await visitor.getByRole('button',{name:'Sign in',exact:true}).click();
+  await visitor.locator('#content[aria-busy="false"]').waitFor();
+  // Fixture session for the migrated garden, whose local simulated hardware is
+  // exercised below. This writes only the test's temporary SQLite database.
+  const token='b'.repeat(64);
+  execFileSync('python3',['-c',`import sqlite3,hashlib,sys,time
+with sqlite3.connect(sys.argv[1]) as db:
+ db.execute("INSERT INTO sessions(token_hash,user_id,garden_id,expires_at) VALUES(?,?,?,?)",(hashlib.sha256(sys.argv[2].encode()).hexdigest(),"00000000-0000-0000-0000-000000000002","00000000-0000-0000-0000-000000000001",int(time.time())+3600))`,join(folder,'data','journal.sqlite3'),token]);
   const page = await browser.newPage({viewport:{width:1440,height:1050}});
+  await page.context().addCookies([{name:'plant_session',value:token,url:base,httpOnly:true,sameSite:'Lax'}]);
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
   const go = async path => {await page.goto(base+path);await page.locator('#content[aria-busy="false"]').waitFor();assert.equal(await page.locator('#notice.error').count(),0);};
   const closed = async () => page.locator('dialog').waitFor({state:'hidden'});
   const dialog = () => page.locator('dialog');
+  const uploadAndDelete = async () => {
+    await page.getByRole('button', {name:'Add photo', exact:true}).first().click();
+    await dialog().getByLabel('Photo', {exact:true}).setInputFiles({name:'photo.gif', mimeType:'image/gif', buffer:Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==','base64')});
+    await dialog().getByRole('button', {name:'Upload photo', exact:true}).click();await closed();
+    await page.locator('.photo-card img').waitFor();
+    await page.locator('.photo-card img').scrollIntoViewIfNeeded();
+    await page.waitForFunction(()=>{const img=document.querySelector('.photo-card img');return img?.complete && img.naturalWidth===1;});
+    await page.reload();await page.locator('.photo-card img').waitFor();
+    await page.locator('.photo-card').getByRole('button', {name:'Delete',exact:true}).click();
+    await dialog().getByRole('button', {name:'Delete permanently',exact:true}).click();await closed();
+    await page.locator('.photo-card').waitFor({state:'hidden'});
+  };
+  await go('/settings');
+  await page.getByRole('button',{name:'Add collaborator',exact:true}).click();
+  await dialog().getByLabel('Account email').fill('browser@example.com');
+  await dialog().getByRole('button',{name:'Add collaborator',exact:true}).click();await closed();
+  await page.getByText('browser@example.com',{exact:true}).waitFor();
+  await visitor.reload();await visitor.locator('#content[aria-busy="false"]').waitFor();
+  await Promise.all([visitor.waitForNavigation(), visitor.getByLabel('Your garden',{exact:true}).selectOption('00000000-0000-0000-0000-000000000001')]);
+  await visitor.locator('#content[aria-busy="false"]').waitFor();
+  await visitor.goto(base+'/settings');await visitor.locator('#content[aria-busy="false"]').waitFor();
+  assert.equal(await visitor.getByRole('button',{name:'Add collaborator',exact:true}).count(),0);
+  await page.getByRole('button',{name:'Remove',exact:true}).click();
+  await dialog().getByRole('button',{name:'Remove collaborator',exact:true}).click();await closed();
+  await visitor.close();
   await go('/seeds');
   await page.getByRole('button',{name:'+ Add your first seeds',exact:true}).click();
   await dialog().getByLabel('Name',{exact:true}).fill('Tomato <seed>');
@@ -52,6 +96,7 @@ try {
   await dialog().getByRole('button',{name:'Save',exact:true}).click();await closed();
   await page.getByRole('heading',{name:'Tomato <seed>',exact:true}).waitFor();
   await page.getByText('3 packets',{exact:true}).waitFor();
+  await uploadAndDelete();
   await page.getByRole('button',{name:'Edit',exact:true}).click();
   await dialog().getByLabel('Quantity on hand').fill('0');
   await dialog().getByRole('button',{name:'Save',exact:true}).click();await closed();
@@ -74,7 +119,10 @@ try {
   await dialog().getByLabel('Species or variety').fill('Monstera deliciosa');
   await dialog().getByLabel('Plant notes').fill('New leaves near the grow light.');
   await dialog().getByRole('button',{name:'Save',exact:true}).click();await closed();
-  await page.getByRole('link',{name:'Monstera',exact:true}).waitFor();
+  await page.getByRole('link',{name:'Monstera',exact:true}).click();
+  await page.getByRole('heading',{name:'Photo history',exact:true}).waitFor();
+  await uploadAndDelete();
+  await go('/plants');
   await page.getByRole('button',{name:'+ Add a plant',exact:true}).click();
   await dialog().getByLabel('Name',{exact:true}).fill('Pothos');
   await dialog().getByRole('button',{name:'Save',exact:true}).click();await closed();

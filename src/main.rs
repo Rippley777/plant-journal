@@ -38,10 +38,20 @@ async fn main() -> anyhow::Result<()> {
         database.close().await;
         return Ok(());
     }
+    if args.len() == 2 && args[0] == "--set-password" {
+        let password = rpassword::prompt_password("New password (12–128 characters): ")?;
+        let confirm = rpassword::prompt_password("Confirm password: ")?;
+        anyhow::ensure!(password == confirm, "Passwords did not match");
+        let app = App::open(config).await?;
+        plant_journal::auth::set_password(&app.pool, &args[1], password).await?;
+        println!("Password saved; existing sessions revoked.");
+        app.pool.close().await;
+        return Ok(());
+    }
     if !args.is_empty() {
         anyhow::ensure!(
             args.len() == 2 && args[0] == "--import-sqlite",
-            "Usage: plant-journal [--version | --check-database | --migrate | --import-sqlite PATH]"
+            "Usage: plant-journal [--version | --check-database | --migrate | --import-sqlite PATH | --set-password EMAIL]"
         );
         anyhow::ensure!(
             config.database.backend == "azure_sql",

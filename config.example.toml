@@ -2,6 +2,8 @@
 # Set to 0.0.0.0:3000 to access this service from other devices on your trusted LAN.
 bind = "127.0.0.1:3000"
 data_dir = "data"
+# Local HTTP development only. Keep true (the default) for HTTPS deployments.
+secure_cookies = false
 
 [database]
 # This configuration is the offline development mode.
