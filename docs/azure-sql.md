@@ -25,7 +25,7 @@ cargo run --locked
 
 `AZURE_SQL_PASSWORD` must be set as well. Do not put real credentials in example commands committed to this repository. `server` and `name` in TOML can replace the corresponding environment variables; environment variables take precedence. Credentials always come from the names configured by `username_env` and `password_env`.
 
-The `--migrate` command exits after schema setup, without starting the HTTP server or hardware workers. Migrations execute in a transaction under a database application lock and are versioned in `dbo.journal_schema`. Normal startup also migrates when `database.migrate = true`; with `false`, it verifies the schema exists. Use a dedicated database: table names are under `dbo` and could collide with unrelated application tables.
+The `--migrate` command exits after schema setup, without starting the HTTP server or hardware workers. Migrations execute in a transaction under a database application lock and are versioned in `dbo.journal_schema`. Normal startup also migrates when `database.migrate = true`; with `false`, it verifies schema version 2 is installed. Use a dedicated database: table names are under `dbo` and could collide with unrelated application tables.
 
 The default Rust startup (`cargo run` without `PLANT_CONFIG`) still uses SQLite, so existing journals and developer tests work without Azure credentials. The supplied Pi deployment configuration selects Azure SQL explicitly.
 
@@ -166,3 +166,18 @@ PLANT_AZURE_TEST=1 cargo test --locked --test azure_sql -- --ignored --nocapture
 ```
 
 The live test writes test data and leaves it in that dedicated database for inspection. Recreate/empty the test database before rerunning. Never point it at your production journal.
+
+## Seed inventory upgrade (schema version 2)
+
+Before deploying the version with seed inventory, run the new binary with
+`--migrate` using your existing Azure SQL configuration and migration identity
+(as in the setup instructions above). This applies `0002_seed_inventory.sql`,
+adds the `seeds` table, and retains existing journal data. It is safe to rerun:
+applied versions are recorded in `dbo.journal_schema`. The cloud runtime keeps
+`database.migrate = false` and requires version 2 at startup. The old application
+can continue using the upgraded database while you deploy the new version.
+
+SQLite applies this migration automatically on startup. SQLite imports include
+seed inventory when present; sources created before this feature import with
+an empty inventory. Seed quantities are maintained manually, independently of
+plant creation and journal entries.

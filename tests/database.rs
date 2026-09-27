@@ -302,3 +302,87 @@ fn connectivity_cli_requires_exported_environment_and_never_creates_data() {
     assert!(!dir.path().join("diagnostic-data").exists());
     assert!(!dir.path().join("data").exists());
 }
+
+#[tokio::test]
+async fn seed_inventory_import_and_legacy_sources() {
+    let (source_dir, source) = fixture().await;
+    let (_dest_dir, dest) = fixture().await;
+    db::query("INSERT INTO seeds(id,name,variety,quantity,unit,purchase_year,created_at) VALUES('seed','Tomato','Purple',3,'packets',2026,1000)").execute(&source.pool).await.unwrap();
+    let counts = import::sqlite_to_database(&source_dir.path().join("journal.sqlite3"), &dest.pool)
+        .await
+        .unwrap();
+    assert_eq!(counts["seeds"], 1);
+    let seed: plant_journal::models::Seed = db::query_as("SELECT * FROM seeds")
+        .fetch_one(&dest.pool)
+        .await
+        .unwrap();
+    assert_eq!(seed.quantity, 3);
+    assert_eq!(seed.purchase_year, Some(2026));
+    assert!(
+        import::sqlite_to_database(&source_dir.path().join("journal.sqlite3"), &dest.pool)
+            .await
+            .is_err()
+    );
+    db::query("DROP TABLE seeds")
+        .execute(&source.pool)
+        .await
+        .unwrap();
+    let (_legacy_dest_dir, legacy_dest) = fixture().await;
+    let counts = import::sqlite_to_database(
+        &source_dir.path().join("journal.sqlite3"),
+        &legacy_dest.pool,
+    )
+    .await
+    .unwrap();
+    assert_eq!(counts["seeds"], 0);
+}
+
+#[tokio::test]
+async fn seed_migration_upgrades_existing_sqlite_journal() {
+    use sqlx::{
+        migrate::Migrator,
+        sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let pool = SqlitePoolOptions::new()
+        .connect_with(
+            SqliteConnectOptions::new()
+                .filename(dir.path().join("journal.sqlite3"))
+                .create_if_missing(true),
+        )
+        .await
+        .unwrap();
+    let migrations = tempfile::tempdir().unwrap();
+    std::fs::write(
+        migrations.path().join("0001_initial.sql"),
+        include_str!("../migrations/sqlite/0001_initial.sql"),
+    )
+    .unwrap();
+    Migrator::new(migrations.path())
+        .await
+        .unwrap()
+        .run(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO plants(id,name,created_at) VALUES('existing','Fern',1000)")
+        .execute(&pool)
+        .await
+        .unwrap();
+    pool.close().await;
+    let app = App::open(Config {
+        data_dir: dir.path().into(),
+        ..Config::default()
+    })
+    .await
+    .unwrap();
+    let name: String = db::query_scalar("SELECT name FROM plants WHERE id='existing'")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(name, "Fern");
+    let count: i64 = db::query_scalar("SELECT COUNT(*) FROM seeds")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+}

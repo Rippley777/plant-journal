@@ -5,6 +5,10 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::{collections::BTreeMap, path::Path};
 
 const TABLES: &[(&str, &str)] = &[
+    (
+        "seeds",
+        "id,name,variety,quantity,unit,supplier,purchase_year,storage_location,notes,created_at",
+    ),
     ("plants", "id,name,species,notes,archived,created_at"),
     ("entries", "id,kind,body,occurred_at,created_at"),
     ("photos", "id,filename,captured_at,source"),
@@ -50,6 +54,18 @@ pub async fn sqlite_to_database(
     }
     let mut counts = BTreeMap::new();
     for (table, columns) in TABLES {
+        // Older read-only source journals predate seed inventory.
+        if *table == "seeds" {
+            let exists: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='seeds'",
+            )
+            .fetch_one(&mut *snapshot)
+            .await?;
+            if exists == 0 {
+                counts.insert(table.to_string(), 0);
+                continue;
+            }
+        }
         let raw = sqlx::query(&format!("SELECT {columns} FROM {table}"))
             .fetch_all(&mut *snapshot)
             .await?;

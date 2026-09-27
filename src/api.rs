@@ -58,6 +58,7 @@ fn render(page: &str) -> Response {
     let title = match page {
         "dashboard" => "Overview",
         "plants" => "Your plants",
+        "seeds" => "Seed inventory",
         "journal" => "Journal",
         "calendar" => "Calendar",
         "photos" => "Photo journal",
@@ -96,6 +97,8 @@ pub fn router(app: Arc<App>) -> Router {
         )
          .route("/assets/favicon.svg", get(|| async { ([(header::CONTENT_TYPE,"image/svg+xml")], r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#355a43"/><path d="M32 52V22M32 38C9 39 11 13 11 13S36 12 32 38M32 29C32 10 55 10 55 10S56 31 32 29" fill="none" stroke="#e7ecdf" stroke-width="4"/></svg>"##) }))
         .route("/api/v1/summary", get(summary))
+        .route("/api/v1/seeds", get(seeds).post(create_seed))
+        .route("/api/v1/seeds/{id}", axum::routing::put(update_seed).delete(delete_seed))
         .route("/api/v1/plants", get(plants).post(create_plant))
         .route("/api/v1/plants/{id}", get(plant).put(update_plant))
         .route("/api/v1/entries", get(entries).post(create_entry))
@@ -894,5 +897,80 @@ async fn update_settings(
         "Timezone and photo schedule saved",
     )
     .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn seeds(State(app): State<Arc<App>>) -> Result<Json<Vec<Seed>>> {
+    Ok(Json(
+        db::query_as("SELECT * FROM seeds ORDER BY name COLLATE NOCASE,variety,id")
+            .sql_server(
+                "SELECT * FROM seeds ORDER BY name COLLATE Latin1_General_100_CI_AS_SC,variety,id",
+            )
+            .fetch_all(&app.pool)
+            .await?,
+    ))
+}
+fn check_seed(input: &SeedInput) -> Result<()> {
+    text(&input.name, "Name", 120)?;
+    if input.variety.len() > 160
+        || input.supplier.len() > 160
+        || input.storage_location.len() > 160
+        || input.notes.len() > 10000
+    {
+        return Err(ApiError::bad(
+            "Variety, supplier, storage location, or notes are too long",
+        ));
+    }
+    if !(0..=1_000_000_000).contains(&input.quantity) {
+        return Err(ApiError::bad(
+            "Quantity must be a whole number between 0 and 1000000000",
+        ));
+    }
+    if !matches!(input.unit.as_str(), "seeds" | "packets") {
+        return Err(ApiError::bad("Unit must be seeds or packets"));
+    }
+    if input
+        .purchase_year
+        .is_some_and(|year| !(1900..=2100).contains(&year))
+    {
+        return Err(ApiError::bad("Purchase year must be between 1900 and 2100"));
+    }
+    Ok(())
+}
+async fn create_seed(
+    State(app): State<Arc<App>>,
+    Json(input): Json<SeedInput>,
+) -> Result<(StatusCode, Json<Value>)> {
+    check_seed(&input)?;
+    let id = store::id();
+    db::query("INSERT INTO seeds(id,name,variety,quantity,unit,supplier,purchase_year,storage_location,notes,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)")
+        .bind(&id).bind(input.name.trim()).bind(&input.variety).bind(input.quantity).bind(&input.unit)
+        .bind(&input.supplier).bind(input.purchase_year).bind(&input.storage_location).bind(&input.notes)
+        .bind(Utc::now().timestamp()).execute(&app.pool).await?;
+    Ok((StatusCode::CREATED, Json(json!({"id":id}))))
+}
+async fn update_seed(
+    State(app): State<Arc<App>>,
+    Path(id): Path<String>,
+    Json(input): Json<SeedInput>,
+) -> Result<StatusCode> {
+    check_seed(&input)?;
+    let result = db::query("UPDATE seeds SET name=?,variety=?,quantity=?,unit=?,supplier=?,purchase_year=?,storage_location=?,notes=? WHERE id=?")
+        .bind(input.name.trim()).bind(&input.variety).bind(input.quantity).bind(&input.unit)
+        .bind(&input.supplier).bind(input.purchase_year).bind(&input.storage_location).bind(&input.notes)
+        .bind(&id).execute(&app.pool).await?;
+    if result.rows_affected() == 0 {
+        return Err(ApiError::missing());
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+async fn delete_seed(State(app): State<Arc<App>>, Path(id): Path<String>) -> Result<StatusCode> {
+    let result = db::query("DELETE FROM seeds WHERE id=?")
+        .bind(&id)
+        .execute(&app.pool)
+        .await?;
+    if result.rows_affected() == 0 {
+        return Err(ApiError::missing());
+    }
     Ok(StatusCode::NO_CONTENT)
 }

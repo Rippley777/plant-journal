@@ -30,6 +30,7 @@ Use `bind = "0.0.0.0:3000"` to open the app from a phone at `http://<computer-or
 ## What is included
 
 - Plant profiles, notes, species/variety, and archival that preserves history.
+- Seed inventory with varieties, quantities in seeds or packets, supplier, purchase year, storage location, and notes. Add, edit, and delete stock from **Seeds**; zero quantity keeps an out-of-stock record.
 - Dated notes, watering, feeding, pruning, and repotting entries linked to one or several plants; edit and delete support.
 - Month calendar with selected-day details and plant/event filters. Shared environment and equipment events appear under **All plants**; a plant filter shows explicitly linked events.
 - Daily grow-space photos and **Capture now**, with editable plant associations and explicit deletion. Daily/manual captures initially link to all active plants. A single image is shared by all its plant links.
@@ -174,6 +175,8 @@ All endpoints are under `/api/v1`. Mutations use JSON; timestamps are Unix secon
 | Endpoint | Behavior |
 | --- | --- |
 | `GET /summary` | Counts, last reading/staleness, health, configured adapter modes, settings |
+| `GET, POST /seeds` | List inventory / create `{name,variety?,quantity,unit,supplier?,purchase_year?,storage_location?,notes?}`; unit is `seeds` or `packets` |
+| `PUT, DELETE /seeds/{id}` | Replace inventory record / permanently delete it |
 | `GET, POST /plants` | List all plants / create `{name,species?,notes?,archived?}` |
 | `GET, PUT /plants/{id}` | Read / replace profile; archive through `archived` |
 | `GET, POST /entries` | Optional `?plant=id`; create `{kind,body,occurred_at,plant_ids}` |

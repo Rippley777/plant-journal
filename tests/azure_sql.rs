@@ -77,6 +77,25 @@ async fn azure_sql_end_to_end_contract() {
         .unwrap();
     assert_eq!(count, 0, "Use an empty test database");
     let router = api::router(app.clone());
+    let seed = json!({"name":"Tomato 🌱","variety":"O'Brien","quantity":2,"unit":"packets","purchase_year":2026});
+    let (status, created) = request(&router, "POST", "/api/v1/seeds", Some(seed.clone())).await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    let path = format!("/api/v1/seeds/{}", created["id"].as_str().unwrap());
+    let (status, seeds) = request(&router, "GET", "/api/v1/seeds", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(seeds[0]["variety"], "O'Brien");
+    assert_eq!(
+        request(&router, "PUT", &path, Some(seed)).await.0,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        request(&router, "DELETE", &path, None).await.0,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        request(&router, "DELETE", &path, None).await.0,
+        StatusCode::NOT_FOUND
+    );
     let (status, plant) = request(
         &router,
         "POST",

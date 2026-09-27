@@ -107,7 +107,7 @@ impl Database {
                 if config.migrate {
                     database.migrate().await?;
                 } else {
-                    query_scalar::<i64>("SELECT version FROM journal_schema WHERE version=1").fetch_one(&database).await.context("Azure SQL schema verification failed; inspect the underlying error before running --migrate")?;
+                    query_scalar::<i64>("SELECT version FROM journal_schema WHERE version=2").fetch_one(&database).await.context("Azure SQL schema verification failed; inspect the underlying error before running --migrate")?;
                 }
                 Ok(database)
             }
@@ -151,6 +151,19 @@ impl Database {
                 .execute(&mut tx)
                 .await?;
             query("INSERT INTO journal_schema(version) VALUES(1)")
+                .execute(&mut tx)
+                .await?;
+        }
+        let exists: i64 = query_scalar("SELECT COUNT(*) FROM journal_schema WHERE version=2")
+            .fetch_one(&mut tx)
+            .await?;
+        if exists == 0 {
+            query(include_str!(
+                "../migrations/azure_sql/0002_seed_inventory.sql"
+            ))
+            .execute(&mut tx)
+            .await?;
+            query("INSERT INTO journal_schema(version) VALUES(2)")
                 .execute(&mut tx)
                 .await?;
         }

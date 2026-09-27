@@ -184,3 +184,45 @@ record!(Health {
     last_error,
     checked_at
 });
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct Seed {
+    pub id: String,
+    pub name: String,
+    pub variety: String,
+    pub quantity: i64,
+    pub unit: String,
+    pub supplier: String,
+    pub purchase_year: Option<i64>,
+    pub storage_location: String,
+    pub notes: String,
+    pub created_at: i64,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SeedInput {
+    pub name: String,
+    #[serde(default)]
+    pub variety: String,
+    pub quantity: i64,
+    pub unit: String,
+    #[serde(default)]
+    pub supplier: String,
+    pub purchase_year: Option<i64>,
+    #[serde(default)]
+    pub storage_location: String,
+    #[serde(default)]
+    pub notes: String,
+}
+record!(Seed {
+    id,
+    name,
+    variety,
+    quantity,
+    unit,
+    supplier,
+    purchase_year,
+    storage_location,
+    notes,
+    created_at
+});

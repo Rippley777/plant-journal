@@ -873,3 +873,76 @@ async fn cloud_configuration_serves_journal_without_hardware_workers_or_commands
         .unwrap();
     assert_eq!(count, 0);
 }
+
+#[tokio::test]
+async fn seed_inventory_persists_validates_and_deletes() {
+    let (dir, app, router) = setup().await;
+    assert_eq!(
+        request(&router, "GET", "/seeds", None).await.0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        request(&router, "GET", "/api/v1/seeds", None).await.1,
+        json!([])
+    );
+    let mut seed = json!({"name":"  Tomato 🌱  ","variety":"O'Brien's <heirloom>","quantity":12,"unit":"seeds","supplier":"Seed library","purchase_year":2026,"storage_location":"Fridge","notes":"Keep dry"});
+    let (status, created) = request(&router, "POST", "/api/v1/seeds", Some(seed.clone())).await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    let path = format!("/api/v1/seeds/{}", created["id"].as_str().unwrap());
+    for (field, value) in [
+        ("quantity", json!(-1)),
+        ("quantity", json!(1.5)),
+        ("quantity", json!(1_000_000_001i64)),
+        ("unit", json!("bags")),
+        ("name", json!("  ")),
+        ("purchase_year", json!(1800)),
+        ("notes", json!("x".repeat(10001))),
+    ] {
+        let mut invalid = seed.clone();
+        invalid[field] = value;
+        assert!(request(&router, "PUT", &path, Some(invalid))
+            .await
+            .0
+            .is_client_error());
+    }
+    let saved = request(&router, "GET", "/api/v1/seeds", None).await.1;
+    assert_eq!(saved[0]["quantity"], 12);
+    assert_eq!(saved[0]["name"], "Tomato 🌱");
+    assert_eq!(saved[0]["variety"], seed["variety"]);
+    seed["quantity"] = json!(0);
+    seed["unit"] = json!("packets");
+    seed["purchase_year"] = Value::Null;
+    assert_eq!(
+        request(&router, "PUT", &path, Some(seed.clone())).await.0,
+        StatusCode::NO_CONTENT
+    );
+    drop(router);
+    app.pool.close().await;
+    drop(app);
+    let reopened = App::open(Config {
+        data_dir: dir.path().into(),
+        ..Config::default()
+    })
+    .await
+    .unwrap();
+    let router = api::router(reopened);
+    let saved = request(&router, "GET", "/api/v1/seeds", None).await.1;
+    assert_eq!(saved[0]["quantity"], 0);
+    assert!(saved[0]["purchase_year"].is_null());
+    assert_eq!(
+        request(&router, "DELETE", &path, None).await.0,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        request(&router, "DELETE", &path, None).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        request(&router, "PUT", &path, Some(seed)).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        request(&router, "GET", "/api/v1/seeds", None).await.1,
+        json!([])
+    );
+}

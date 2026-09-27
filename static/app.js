@@ -47,6 +47,43 @@ function plantEditor(id) {
     await api('/plants'+(plant?'/'+plant.id:''),plant?'PUT':'POST',{name:data.get('name'),species:data.get('species'),notes:data.get('notes'),archived:data.has('archived')});notice(plant?'Plant updated.':'Your plant is ready for its first entry.');
   });
 }
+let currentSeeds = [];
+function seedEditor(id) {
+  const seed = currentSeeds.find(s => s.id === id);
+  modal(seed ? 'Edit seeds' : 'Add seeds', formWrap(`
+    <div class="grid two-col"><label>Name<input name="name" required maxlength="120" value="${esc(seed?.name)}" placeholder="e.g. Tomato"></label><label>Variety<input name="variety" maxlength="160" value="${esc(seed?.variety)}" placeholder="e.g. Cherokee Purple"></label></div>
+    <div class="grid two-col"><label>Quantity on hand<input name="quantity" type="number" required min="0" max="1000000000" step="1" value="${seed?.quantity ?? 1}"></label><label>Unit<select name="unit"><option value="seeds" ${seed?.unit==='seeds'?'selected':''}>Seeds</option><option value="packets" ${(!seed || seed.unit==='packets')?'selected':''}>Packets</option></select></label></div>
+    <div class="grid two-col"><label>Supplier<input name="supplier" maxlength="160" value="${esc(seed?.supplier)}"></label><label>Purchase year<input name="purchase_year" type="number" min="1900" max="2100" step="1" value="${esc(seed?.purchase_year)}"></label></div>
+    <label>Storage location<input name="storage_location" maxlength="160" value="${esc(seed?.storage_location)}" placeholder="e.g. Fridge, seed box"></label>
+    <label>Notes<textarea name="notes" maxlength="10000" placeholder="Sowing instructions, germination results, or anything to remember…">${esc(seed?.notes)}</textarea></label>`), async data => {
+    await api('/seeds' + (seed ? '/' + seed.id : ''), seed ? 'PUT' : 'POST', {
+      name: data.get('name'), variety: data.get('variety'), quantity: Number(data.get('quantity')),
+      unit: data.get('unit'), supplier: data.get('supplier'),
+      purchase_year: data.get('purchase_year') ? Number(data.get('purchase_year')) : null,
+      storage_location: data.get('storage_location'), notes: data.get('notes')
+    });
+    notice('Seed inventory saved.');
+  });
+}
+async function seedsPage() {
+  heading('What’s tucked away for your next growing season.', button('+ Add seeds', 'seed'));
+  currentSeeds = await api('/seeds');
+  $('#content').innerHTML = currentSeeds.length ? `<div class="grid three-col">${currentSeeds.map(seed => `
+    <article class="card card-body"><div class="row spread"><h2>${esc(seed.name)}</h2><span class="badge ${seed.quantity===0?'warn':''}">${seed.quantity===0?'Out of stock':`${seed.quantity} ${esc(seed.unit)}`}</span></div>
+    <p class="muted">${esc(seed.variety || 'No variety recorded')}</p>
+    ${seed.supplier?`<p>Supplier: ${esc(seed.supplier)}</p>`:''}
+    ${seed.purchase_year?`<p>Purchased: ${seed.purchase_year}</p>`:''}
+    ${seed.storage_location?`<p>Stored: ${esc(seed.storage_location)}</p>`:''}
+    ${seed.notes?`<p class="entry-text">${esc(seed.notes)}</p>`:''}
+    <div class="row section-space">${button('Edit','seed',seed.id,'secondary small')}${button('Delete','delete-seed',seed.id,'secondary small')}</div></article>`).join('')}</div>` : empty('Your next season starts here', 'Keep track of seed packets, varieties, and what you have left.', button('+ Add your first seeds', 'seed'));
+}
+function deleteSeed(id) {
+  const seed = currentSeeds.find(s => s.id === id);
+  modal('Delete seeds?', formWrap(`<p>Remove ${esc(seed.name)} from your seed inventory? This cannot be undone.</p>`, 'Delete permanently'), async () => {
+    await api('/seeds/' + id, 'DELETE');notice('Seeds removed.');
+  });
+}
+
 function entryEditor(id) {
   const entry=currentEntries.find(e=>e.id===id);const initialIds=entry?.plant_ids || (selectedPlant?[selectedPlant]:[]);
   modal(entry?'Edit journal entry':'A note from the grow space',formWrap(`<div class="grid two-col"><label>Entry type<select name="kind">${['note','watering','feeding','pruning','repotting'].map(k=>`<option ${entry?.kind===k?'selected':''} value="${k}">${k[0].toUpperCase()+k.slice(1)}</option>`).join('')}</select></label><label>When<input type="datetime-local" name="when" required value="${localInput(entry?.occurred_at || Date.now()/1000)}"></label></div><p class="helper">Enter time in this browser’s timezone. History displays in ${esc(summary.settings.timezone)}.</p>${picker(initialIds,true)}<label>Observation<textarea name="body" required maxlength="20000" placeholder="A new leaf, a little water, a change worth remembering…">${esc(entry?.body)}</textarea></label><p class="helper">Watering entries record care you confirm. The sPlant timer operates independently.</p>`),async data=>{
@@ -172,7 +209,7 @@ async function load() {
   $('#storage-note').textContent=summary.database_backend==='azure_sql'?'Azure SQL journal · Local photos':'Local journal · Local photos';
   if(!month)month=dateKey(Date.now()/1000).slice(0,7);
   $('#today').textContent=formatDate(Date.now()/1000,{weekday:'long',year:'numeric'});
-  await ({dashboard,plants:plantsPage,journal:journalPage,calendar:calendarPage,photos:photosPage,environment:environmentPage,equipment:equipmentPage,settings:settingsPage}[page] || dashboard)();
+  await ({dashboard,plants:plantsPage,seeds:seedsPage,journal:journalPage,calendar:calendarPage,photos:photosPage,environment:environmentPage,equipment:equipmentPage,settings:settingsPage}[page] || dashboard)();
   $('#content').setAttribute('aria-busy','false');
 }
 async function run(fn) {try{await fn();}catch(error){notice(error.message,true);$('#content').setAttribute('aria-busy','false');}}
@@ -181,6 +218,8 @@ document.addEventListener('click',event=>{
   const {action,id}=target.dataset;
   run(async()=>{
     if(action==='plant')plantEditor(id);
+    if(action==='seed')seedEditor(id);
+    if(action==='delete-seed')deleteSeed(id);
     if(action==='entry')entryEditor(id);
     if(action==='photo-links')photoEditor(id);
     if(action==='delete-entry')await confirmDelete('entries',id);
