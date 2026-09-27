@@ -1,15 +1,67 @@
 use plant_journal::{api, automation, config::Config, App};
+use tracing_subscriber::prelude::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
+    tracing_subscriber::registry()
+        .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "plant_journal=info,tower_http=info".into()),
+                .unwrap_or_else(|_| "plant_journal=info,tower_http=info".into())
+                // The audited INFO TLS milestones drive phase diagnostics; never enable
+                // Tiberius packet/query tracing here.
+                .add_directive("tiberius::client::connection=info".parse().unwrap()),
         )
+        .with(plant_journal::database::diagnostics::HandshakeLayer)
+        .with(tracing_subscriber::fmt::layer())
         .init();
     let config = Config::load()?;
     let bind = config.bind;
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args == ["--version"] {
+        println!("plant-journal {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    if args == ["--check-database"] {
+        plant_journal::database::check_connection(&config.database).await?;
+        println!("Azure SQL DNS, TCP, TLS, SQL login, database selection, and SELECT 1 succeeded");
+        return Ok(());
+    }
+    if args == ["--migrate"] {
+        let mut database_config = config.database.clone();
+        database_config.migrate = true;
+        let database = plant_journal::database::Database::open(
+            &database_config,
+            &config.data_dir.join("journal.sqlite3"),
+        )
+        .await?;
+        println!("{} schema is ready", database.backend());
+        database.close().await;
+        return Ok(());
+    }
+    if !args.is_empty() {
+        anyhow::ensure!(
+            args.len() == 2 && args[0] == "--import-sqlite",
+            "Usage: plant-journal [--version | --check-database | --migrate | --import-sqlite PATH]"
+        );
+        anyhow::ensure!(
+            config.database.backend == "azure_sql",
+            "--import-sqlite requires database.backend=azure_sql"
+        );
+        let destination = plant_journal::database::Database::open(
+            &config.database,
+            &config.data_dir.join("journal.sqlite3"),
+        )
+        .await?;
+        let counts =
+            plant_journal::import::sqlite_to_database(std::path::Path::new(&args[1]), &destination)
+                .await?;
+        for (table, count) in counts {
+            println!("{table}: {count} rows copied");
+        }
+        println!("Import complete. Schedules, overrides, and automatic photos are disabled. Photos remain in the configured local data directory.");
+        destination.close().await;
+        return Ok(());
+    }
     let app = App::open(config).await?;
     let listener = tokio::net::TcpListener::bind(bind).await?;
     let tasks = automation::spawn(app.clone());

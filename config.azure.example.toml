@@ -1,0 +1,25 @@
+# Copy to config.toml and set the Azure environment variables described in docs/azure-sql.md.
+bind = "127.0.0.1:3000"
+# Photo files stay here. For an existing installation, keep its existing data directory.
+data_dir = "data"
+
+[database]
+backend = "azure_sql"
+# May be supplied here or via AZURE_SQL_SERVER and AZURE_SQL_DATABASE.
+server = ""
+name = ""
+port = 1433
+username_env = "AZURE_SQL_USERNAME"
+password_env = "AZURE_SQL_PASSWORD"
+# First run needs DDL permissions. After migration, use migrate=false with a data-only identity.
+migrate = true
+
+[sensor]
+adapter = "simulated"
+path = "/sys/bus/iio/devices/iio:device0"
+
+[camera]
+adapter = "simulated"
+device = "/dev/video0"
+format = "mjpeg"
+size = "1280x720"

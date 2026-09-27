@@ -8,6 +8,7 @@ Type=simple
 User=plant-journal
 Group=plant-journal
 SupplementaryGroups=video
+EnvironmentFile=-/etc/plant-journal/azure.env
 Environment=PLANT_CONFIG=/etc/plant-journal/config.toml
 Environment=RUST_LOG=plant_journal=info,tower_http=info
 ExecStart=/usr/local/bin/plant-journal

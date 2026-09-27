@@ -7,6 +7,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use chrono_tz::America::Chicago;
 use http_body_util::BodyExt;
+use plant_journal::database as db;
 use plant_journal::{
     adapters::{Camera, IioSensor, Sensor, Switch},
     api, automation,
@@ -155,7 +156,7 @@ async fn invalid_plant_associations_and_inputs_do_not_create_partial_records() {
     let a = add_plant(&router, "Fern").await;
     let (status,_)=request(&router,"POST","/api/v1/entries",Some(json!({"kind":"watering","body":"No phantom entries","occurred_at":1,"plant_ids":[a,"missing"]}))).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM entries")
+    let count: i64 = db::query_scalar("SELECT COUNT(*) FROM entries")
         .fetch_one(&app.pool)
         .await
         .unwrap();
@@ -194,7 +195,7 @@ async fn calendar_respects_local_month_and_summarizes_local_days() {
         )
         .await;
         assert_eq!(status, StatusCode::CREATED);
-        sqlx::query(
+        db::query(
             "INSERT INTO readings(recorded_at,temperature_c,humidity_percent) VALUES(?,22,55)",
         )
         .bind(t)
@@ -413,16 +414,15 @@ async fn camera_failure_cleans_partial_file_records_failure_and_does_not_retry_d
             .count(),
         0
     );
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM photos")
+    let count: i64 = db::query_scalar("SELECT COUNT(*) FROM photos")
         .fetch_one(&app.pool)
         .await
         .unwrap();
     assert_eq!(count, 0);
-    let error: String =
-        sqlx::query_scalar("SELECT last_error FROM health WHERE component='camera'")
-            .fetch_one(&app.pool)
-            .await
-            .unwrap();
+    let error: String = db::query_scalar("SELECT last_error FROM health WHERE component='camera'")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
     assert_eq!(error, "Camera disconnected");
     assert!(automation::capture(&app, 1100, vec![], Some("2026-09-12"))
         .await
@@ -435,7 +435,7 @@ async fn failed_image_write_never_creates_successful_photo() {
     std::fs::remove_dir(dir.path().join("photos")).unwrap();
     std::fs::write(dir.path().join("photos"), "not a directory").unwrap();
     assert!(automation::capture(&app, 1000, vec![], None).await.is_err());
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM events WHERE kind='photo'")
+    let count: i64 = db::query_scalar("SELECT COUNT(*) FROM events WHERE kind='photo'")
         .fetch_one(&app.pool)
         .await
         .unwrap();
@@ -477,13 +477,13 @@ async fn sensor_failure_preserves_last_good_reading_and_deduplicates_failure_eve
     automation::sample(&app, 1100).await.unwrap();
     automation::sample(&app, 1200).await.unwrap();
     let readings: Vec<Reading> =
-        sqlx::query_as("SELECT recorded_at,temperature_c,humidity_percent FROM readings")
+        db::query_as("SELECT recorded_at,temperature_c,humidity_percent FROM readings")
             .fetch_all(&app.pool)
             .await
             .unwrap();
     assert_eq!(readings.len(), 1);
     assert_eq!(readings[0].recorded_at, 1000);
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM events WHERE kind='failure'")
+    let count: i64 = db::query_scalar("SELECT COUNT(*) FROM events WHERE kind='failure'")
         .fetch_one(&app.pool)
         .await
         .unwrap();
@@ -493,7 +493,7 @@ async fn sensor_failure_preserves_last_good_reading_and_deduplicates_failure_eve
 async fn restart_reconciles_current_schedule_without_replaying_transitions() {
     let (dir, app, router) = setup().await;
     let id = add_device(&router).await;
-    sqlx::query(
+    db::query(
         "UPDATE schedules SET enabled=1,start_time='08:00',end_time='20:00' WHERE device_id=?",
     )
     .bind(&id)
@@ -503,7 +503,7 @@ async fn restart_reconciles_current_schedule_without_replaying_transitions() {
     automation::reconcile(&app, utc("2026-09-12T14:00:00Z"))
         .await
         .unwrap();
-    let state: bool = sqlx::query_scalar("SELECT reported_on FROM devices WHERE id=?")
+    let state: bool = db::query_scalar("SELECT reported_on FROM devices WHERE id=?")
         .bind(&id)
         .fetch_one(&app.pool)
         .await
@@ -521,26 +521,24 @@ async fn restart_reconciles_current_schedule_without_replaying_transitions() {
     automation::reconcile(&reopened, utc("2026-09-15T03:00:00Z"))
         .await
         .unwrap();
-    let state: bool = sqlx::query_scalar("SELECT reported_on FROM devices WHERE id=?")
+    let state: bool = db::query_scalar("SELECT reported_on FROM devices WHERE id=?")
         .bind(&id)
         .fetch_one(&reopened.pool)
         .await
         .unwrap();
     assert!(!state);
-    let count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM events WHERE title LIKE '%requested%'")
-            .fetch_one(&reopened.pool)
-            .await
-            .unwrap();
+    let count: i64 = db::query_scalar("SELECT COUNT(*) FROM events WHERE title LIKE '%requested%'")
+        .fetch_one(&reopened.pool)
+        .await
+        .unwrap();
     assert_eq!(count, 2);
     automation::reconcile(&reopened, utc("2026-09-15T03:01:00Z"))
         .await
         .unwrap();
-    let count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM events WHERE title LIKE '%requested%'")
-            .fetch_one(&reopened.pool)
-            .await
-            .unwrap();
+    let count: i64 = db::query_scalar("SELECT COUNT(*) FROM events WHERE title LIKE '%requested%'")
+        .fetch_one(&reopened.pool)
+        .await
+        .unwrap();
     assert_eq!(count, 2);
 }
 #[tokio::test]
@@ -549,20 +547,20 @@ async fn disabled_schedule_does_not_switch_and_expired_override_returns_off() {
     let id = add_device(&router).await;
     let now = utc("2026-09-12T18:00:00Z");
     automation::reconcile(&app, now).await.unwrap();
-    let command: Option<bool> = sqlx::query_scalar("SELECT commanded_on FROM devices WHERE id=?")
+    let command: Option<bool> = db::query_scalar("SELECT commanded_on FROM devices WHERE id=?")
         .bind(&id)
         .fetch_one(&app.pool)
         .await
         .unwrap();
     assert_eq!(command, None);
-    sqlx::query("INSERT INTO overrides(device_id,on_state,expires_at) VALUES(?,1,?)")
+    db::query("INSERT INTO overrides(device_id,on_state,expires_at) VALUES(?,1,?)")
         .bind(&id)
         .bind(now.timestamp() + 60)
         .execute(&app.pool)
         .await
         .unwrap();
     automation::reconcile(&app, now).await.unwrap();
-    let state: bool = sqlx::query_scalar("SELECT reported_on FROM devices WHERE id=?")
+    let state: bool = db::query_scalar("SELECT reported_on FROM devices WHERE id=?")
         .bind(&id)
         .fetch_one(&app.pool)
         .await
@@ -571,13 +569,13 @@ async fn disabled_schedule_does_not_switch_and_expired_override_returns_off() {
     automation::reconcile(&app, now + chrono::Duration::seconds(60))
         .await
         .unwrap();
-    let state: bool = sqlx::query_scalar("SELECT reported_on FROM devices WHERE id=?")
+    let state: bool = db::query_scalar("SELECT reported_on FROM devices WHERE id=?")
         .bind(&id)
         .fetch_one(&app.pool)
         .await
         .unwrap();
     assert!(!state);
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM overrides")
+    let count: i64 = db::query_scalar("SELECT COUNT(*) FROM overrides")
         .fetch_one(&app.pool)
         .await
         .unwrap();
@@ -599,20 +597,20 @@ async fn outlet_timeout_marks_state_unknown_and_preserves_pending_override() {
     let id = add_device(&router).await;
     drop(router);
     Arc::get_mut(&mut app).unwrap().simulated_switch = Arc::new(HangingSwitch);
-    sqlx::query("INSERT INTO overrides(device_id,on_state,expires_at) VALUES(?,1,0)")
+    db::query("INSERT INTO overrides(device_id,on_state,expires_at) VALUES(?,1,0)")
         .bind(&id)
         .execute(&app.pool)
         .await
         .unwrap();
     automation::reconcile(&app, Utc::now()).await.unwrap();
-    let d: Device = sqlx::query_as("SELECT * FROM devices WHERE id=?")
+    let d: Device = db::query_as("SELECT * FROM devices WHERE id=?")
         .bind(&id)
         .fetch_one(&app.pool)
         .await
         .unwrap();
     assert_eq!(d.reported_on, None);
     assert!(d.last_error.unwrap().contains("timed out"));
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM overrides")
+    let count: i64 = db::query_scalar("SELECT COUNT(*) FROM overrides")
         .fetch_one(&app.pool)
         .await
         .unwrap();
@@ -718,14 +716,14 @@ async fn shelly_rpc_commands_and_verification_use_local_http() {
     let(status,value)=request(&router,"POST","/api/v1/devices",Some(json!({"name":"Local fan","role":"fan","adapter":"shelly","address":format!("http://{address}")}))).await;
     assert_eq!(status, StatusCode::CREATED);
     let id = value["id"].as_str().unwrap();
-    sqlx::query("INSERT INTO overrides(device_id,on_state,expires_at) VALUES(?,1,?)")
+    db::query("INSERT INTO overrides(device_id,on_state,expires_at) VALUES(?,1,?)")
         .bind(id)
         .bind(Utc::now().timestamp() + 3600)
         .execute(&app.pool)
         .await
         .unwrap();
     automation::reconcile(&app, Utc::now()).await.unwrap();
-    let d: Device = sqlx::query_as("SELECT * FROM devices WHERE id=?")
+    let d: Device = db::query_as("SELECT * FROM devices WHERE id=?")
         .bind(id)
         .fetch_one(&app.pool)
         .await
@@ -739,30 +737,30 @@ async fn shelly_rpc_commands_and_verification_use_local_http() {
 async fn editing_outlet_connection_disables_automation_and_clears_old_state() {
     let (_dir, app, router) = setup().await;
     let id = add_device(&router).await;
-    sqlx::query("UPDATE schedules SET enabled=1 WHERE device_id=?")
+    db::query("UPDATE schedules SET enabled=1 WHERE device_id=?")
         .bind(&id)
         .execute(&app.pool)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO overrides(device_id,on_state,expires_at) VALUES(?,1,9999999999)")
+    db::query("INSERT INTO overrides(device_id,on_state,expires_at) VALUES(?,1,9999999999)")
         .bind(&id)
         .execute(&app.pool)
         .await
         .unwrap();
     let (status,_)=request(&router,"PUT",&format!("/api/v1/devices/{id}"),Some(json!({"name":"Actual light","role":"light","adapter":"shelly","address":"http://192.168.1.50"}))).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
-    let enabled: bool = sqlx::query_scalar("SELECT enabled FROM schedules WHERE device_id=?")
+    let enabled: bool = db::query_scalar("SELECT enabled FROM schedules WHERE device_id=?")
         .bind(&id)
         .fetch_one(&app.pool)
         .await
         .unwrap();
     assert!(!enabled);
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM overrides")
+    let count: i64 = db::query_scalar("SELECT COUNT(*) FROM overrides")
         .fetch_one(&app.pool)
         .await
         .unwrap();
     assert_eq!(count, 0);
-    let d: Device = sqlx::query_as("SELECT * FROM devices WHERE id=?")
+    let d: Device = db::query_as("SELECT * FROM devices WHERE id=?")
         .bind(&id)
         .fetch_one(&app.pool)
         .await
@@ -796,7 +794,7 @@ async fn a_stuck_camera_does_not_block_equipment_control() {
         entered: tokio::sync::Notify::new(),
     });
     Arc::get_mut(&mut app).unwrap().camera = Some(camera.clone());
-    sqlx::query("INSERT INTO overrides(device_id,on_state,expires_at) VALUES(?,1,?)")
+    db::query("INSERT INTO overrides(device_id,on_state,expires_at) VALUES(?,1,?)")
         .bind(&id)
         .bind(Utc::now().timestamp() + 3600)
         .execute(&app.pool)
@@ -814,7 +812,7 @@ async fn a_stuck_camera_does_not_block_equipment_control() {
     .await
     .unwrap()
     .unwrap();
-    let on: bool = sqlx::query_scalar("SELECT reported_on FROM devices WHERE id=?")
+    let on: bool = db::query_scalar("SELECT reported_on FROM devices WHERE id=?")
         .bind(&id)
         .fetch_one(&app.pool)
         .await
@@ -822,4 +820,56 @@ async fn a_stuck_camera_does_not_block_equipment_control() {
     assert!(on);
     task.abort();
     let _ = task.await;
+}
+
+#[tokio::test]
+async fn cloud_configuration_serves_journal_without_hardware_workers_or_commands() {
+    let mut config: Config = toml::from_str(include_str!("../deploy/config.cloud.toml")).unwrap();
+    assert!(!config.automation_enabled);
+    assert_eq!(config.database.backend, "azure_sql");
+    assert!(!config.database.migrate);
+    assert_eq!(config.bind.to_string(), "0.0.0.0:3000");
+    assert_eq!(config.sensor.adapter, "disabled");
+    assert_eq!(config.camera.adapter, "disabled");
+    let dir = tempfile::tempdir().unwrap();
+    config.data_dir = dir.path().into();
+    config.database = Default::default(); // No credentials or Azure access in this test.
+    let app = App::open(config).await.unwrap();
+    assert!(app.sensor.is_none());
+    assert!(app.camera.is_none());
+    assert!(automation::spawn(app.clone()).is_empty());
+    let router = api::router(app.clone());
+    let (status, _) = request(&router, "GET", "/healthz", None).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = request(
+        &router,
+        "POST",
+        "/api/v1/plants",
+        Some(json!({"name":"Cloud fern"})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (status, _) = request(
+        &router,
+        "PUT",
+        "/api/v1/overrides/outlet",
+        Some(json!({"on":true})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    let (status, _) = request(&router, "DELETE", "/api/v1/overrides/outlet", None).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    let (status, _) = request(
+        &router,
+        "PUT",
+        "/api/v1/schedules/outlet",
+        Some(json!({"device_id":"outlet","enabled":true,"start_time":"08:00","end_time":"20:00"})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    let count: i64 = db::query_scalar("SELECT COUNT(*) FROM overrides")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
 }

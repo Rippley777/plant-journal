@@ -7,6 +7,9 @@ rust-version = "1.86"
 [dependencies]
 anyhow = "1"
 async-trait = "0.1"
+bb8 = "0.8"
+tiberius = { version = "0.12.3", default-features = false, features = ["rustls", "tds73"] }
+tokio-util = { version = "0.7", features = ["compat"] }
 askama = "0.14"
 axum = { version = "0.8", features = ["json", "query"] }
 chrono = { version = "0.4", features = ["serde"] }
@@ -23,6 +26,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
+tokio = { version = "1", features = ["test-util"] }
 tempfile = "3"
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"

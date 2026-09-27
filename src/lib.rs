@@ -2,17 +2,19 @@ pub mod adapters;
 pub mod api;
 pub mod automation;
 pub mod config;
+pub mod database;
+pub mod import;
 pub mod models;
 pub mod store;
 
 use adapters::{Camera, Sensor, Switch};
 use config::Config;
-use sqlx::SqlitePool;
+use database::Database;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 pub struct App {
-    pub pool: SqlitePool,
+    pub pool: Database,
     pub config: Config,
     pub sensor: Option<Arc<dyn Sensor>>,
     pub camera: Option<Arc<dyn Camera>>,
@@ -24,7 +26,8 @@ pub struct App {
 impl App {
     pub async fn open(config: Config) -> anyhow::Result<Arc<Self>> {
         tokio::fs::create_dir_all(config.data_dir.join("photos")).await?;
-        let pool = store::open(&config.data_dir.join("journal.sqlite3")).await?;
+        let pool =
+            Database::open(&config.database, &config.data_dir.join("journal.sqlite3")).await?;
         Ok(Arc::new(Self {
             sensor: adapters::sensor(&config.sensor)?,
             camera: adapters::camera(&config.camera)?,

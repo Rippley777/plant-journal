@@ -1,3 +1,4 @@
+use crate::database as db;
 use crate::{adapters::validate_reading, models::*, store, App};
 use anyhow::Context;
 use chrono::{DateTime, NaiveTime, Timelike, Utc};
@@ -59,7 +60,7 @@ pub async fn sample(app: &App, now: i64) -> anyhow::Result<()> {
         });
     match result {
         Ok(r) => {
-            sqlx::query(
+            db::query(
                 "INSERT INTO readings(recorded_at,temperature_c,humidity_percent) VALUES(?,?,?)",
             )
             .bind(now)
@@ -87,7 +88,7 @@ pub async fn capture(
         .as_ref()
         .context("Camera is disabled in configuration")?;
     if let Some(date) = local_date {
-        let inserted = sqlx::query("INSERT OR IGNORE INTO capture_runs(local_date,status,attempted_at) VALUES(?,'attempted',?)").bind(date).bind(now).execute(&app.pool).await?.rows_affected();
+        let inserted = db::query("INSERT OR IGNORE INTO capture_runs(local_date,status,attempted_at) VALUES(?,'attempted',?)").sql_server("INSERT INTO capture_runs(local_date,status,attempted_at) SELECT @P1,'attempted',@P2 WHERE NOT EXISTS(SELECT 1 FROM capture_runs WITH (UPDLOCK,HOLDLOCK) WHERE local_date=@P1)").bind(date).bind(now).execute(&app.pool).await?.rows_affected();
         if inserted == 0 {
             return Ok(None);
         }
@@ -113,18 +114,18 @@ pub async fn capture(
         drop(file);
         tokio::fs::rename(&temp, &destination).await?;
         let mut tx = app.pool.begin().await?;
-        sqlx::query("INSERT INTO photos(id,filename,captured_at,source) VALUES(?,?,?,?)")
+        db::query("INSERT INTO photos(id,filename,captured_at,source) VALUES(?,?,?,?)")
             .bind(&id)
             .bind(&filename)
             .bind(now)
             .bind(camera.source())
-            .execute(&mut *tx)
+            .execute(&mut tx)
             .await?;
         for plant in &plants {
-            sqlx::query("INSERT OR IGNORE INTO photo_plants(photo_id,plant_id) VALUES(?,?)")
+            db::query("INSERT OR IGNORE INTO photo_plants(photo_id,plant_id) VALUES(?,?)").sql_server("INSERT INTO photo_plants(photo_id,plant_id) SELECT @P1,@P2 WHERE NOT EXISTS(SELECT 1 FROM photo_plants WITH (UPDLOCK,HOLDLOCK) WHERE photo_id=@P1 AND plant_id=@P2)")
                 .bind(&id)
                 .bind(plant)
-                .execute(&mut *tx)
+                .execute(&mut tx)
                 .await?;
         }
         store::event(
@@ -138,9 +139,9 @@ pub async fn capture(
         )
         .await?;
         if let Some(date) = local_date {
-            sqlx::query("UPDATE capture_runs SET status='complete' WHERE local_date=?")
+            db::query("UPDATE capture_runs SET status='complete' WHERE local_date=?")
                 .bind(date)
-                .execute(&mut *tx)
+                .execute(&mut tx)
                 .await?;
         }
         tx.commit().await?;
@@ -154,9 +155,13 @@ pub async fn capture(
         }
         Err(error) => {
             let _ = tokio::fs::remove_file(&temp).await;
-            let _ = tokio::fs::remove_file(&destination).await;
+            // A remote COMMIT can succeed even if its acknowledgement is lost.
+            // Retain finalized images on database failure to avoid broken committed photo records.
+            if destination.exists() {
+                tracing::warn!(photo_id=%id, "Retained finalized photo after an uncertain database write; reconcile against photo records before cleanup");
+            }
             if let Some(date) = local_date {
-                sqlx::query("UPDATE capture_runs SET status='failed' WHERE local_date=?")
+                db::query("UPDATE capture_runs SET status='failed' WHERE local_date=?")
                     .bind(date)
                     .execute(&app.pool)
                     .await?;
@@ -169,7 +174,7 @@ pub async fn capture(
 pub async fn photo_tick(app: &App, now: DateTime<Utc>) -> anyhow::Result<()> {
     let settings = store::settings(&app.pool).await?;
     if let Some(date) = due_photo(&settings, now)? {
-        let plants: Vec<String> = sqlx::query_scalar("SELECT id FROM plants WHERE archived=0")
+        let plants: Vec<String> = db::query_scalar("SELECT id FROM plants WHERE archived=0")
             .fetch_all(&app.pool)
             .await?;
         capture(app, now.timestamp(), plants, Some(&date)).await?;
@@ -179,15 +184,15 @@ pub async fn photo_tick(app: &App, now: DateTime<Utc>) -> anyhow::Result<()> {
 pub async fn reconcile(app: &App, now: DateTime<Utc>) -> anyhow::Result<()> {
     let _lock = app.control_lock.lock().await;
     let tz: Tz = store::settings(&app.pool).await?.timezone.parse()?;
-    let devices: Vec<Device> = sqlx::query_as("SELECT * FROM devices")
+    let devices: Vec<Device> = db::query_as("SELECT * FROM devices")
         .fetch_all(&app.pool)
         .await?;
     for d in devices {
-        let schedule: Schedule = sqlx::query_as("SELECT * FROM schedules WHERE device_id=?")
+        let schedule: Schedule = db::query_as("SELECT * FROM schedules WHERE device_id=?")
             .bind(&d.id)
             .fetch_one(&app.pool)
             .await?;
-        let manual: Option<Override> = sqlx::query_as("SELECT * FROM overrides WHERE device_id=?")
+        let manual: Option<Override> = db::query_as("SELECT * FROM overrides WHERE device_id=?")
             .bind(&d.id)
             .fetch_optional(&app.pool)
             .await?;
@@ -214,7 +219,7 @@ pub async fn reconcile(app: &App, now: DateTime<Utc>) -> anyhow::Result<()> {
                 if current != on {
                     attempted = true;
                     // Persist intent before talking to the outlet, including unsuccessful commands.
-                    sqlx::query("UPDATE devices SET commanded_on=? WHERE id=?")
+                    db::query("UPDATE devices SET commanded_on=? WHERE id=?")
                         .bind(on)
                         .bind(&d.id)
                         .execute(&app.pool)
@@ -243,7 +248,7 @@ pub async fn reconcile(app: &App, now: DateTime<Utc>) -> anyhow::Result<()> {
         .await;
         match result {
             Ok(on) => {
-                sqlx::query(
+                db::query(
                     "UPDATE devices SET reported_on=?,checked_at=?,last_error=NULL WHERE id=?",
                 )
                 .bind(on)
@@ -255,7 +260,7 @@ pub async fn reconcile(app: &App, now: DateTime<Utc>) -> anyhow::Result<()> {
                     store::log_event(&app.pool,"device",&format!("{} · output {}",d.name,if on {"on"} else {"off"}),now.timestamp(),Some(&d.id),"Device-reported outlet state; equipment operation is not independently measured").await?;
                 }
                 if expired {
-                    sqlx::query("DELETE FROM overrides WHERE device_id=? AND expires_at<=?")
+                    db::query("DELETE FROM overrides WHERE device_id=? AND expires_at<=?")
                         .bind(&d.id)
                         .bind(now.timestamp())
                         .execute(&app.pool)
@@ -264,7 +269,7 @@ pub async fn reconcile(app: &App, now: DateTime<Utc>) -> anyhow::Result<()> {
             }
             Err(error) => {
                 let message = error.to_string();
-                sqlx::query(
+                db::query(
                     "UPDATE devices SET reported_on=NULL,checked_at=?,last_error=? WHERE id=?",
                 )
                 .bind(now.timestamp())
@@ -289,6 +294,10 @@ pub async fn reconcile(app: &App, now: DateTime<Utc>) -> anyhow::Result<()> {
     Ok(())
 }
 pub fn spawn(app: Arc<App>) -> Vec<tokio::task::JoinHandle<()>> {
+    if !app.config.automation_enabled {
+        tracing::info!("Hardware automation is disabled for this instance");
+        return vec![];
+    }
     let mut tasks = vec![];
     for worker in 0..3 {
         let app = app.clone();

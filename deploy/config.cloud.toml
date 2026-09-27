@@ -1,0 +1,20 @@
+# Credentials and server come from Azure App Service environment settings.
+# This image hosts the web application only; Pi hardware runs separately.
+bind = "0.0.0.0:3000"
+data_dir = "/home/plant-journal"
+automation_enabled = false
+
+[database]
+backend = "azure_sql"
+server = ""
+name = "ripsql"
+port = 1433
+username_env = "AZURE_SQL_USERNAME"
+password_env = "AZURE_SQL_PASSWORD"
+migrate = false
+
+[sensor]
+adapter = "disabled"
+
+[camera]
+adapter = "disabled"

@@ -1,3 +1,4 @@
+use crate::database as db;
 use crate::{automation, models::*, store, App};
 use askama::Template;
 use axum::{
@@ -33,11 +34,6 @@ impl From<anyhow::Error> for ApiError {
             StatusCode::INTERNAL_SERVER_ERROR,
             "The operation failed. Check service logs and device health.".into(),
         )
-    }
-}
-impl From<sqlx::Error> for ApiError {
-    fn from(error: sqlx::Error) -> Self {
-        anyhow::Error::from(error).into()
     }
 }
 impl IntoResponse for ApiError {
@@ -77,6 +73,7 @@ fn render(page: &str) -> Response {
 }
 pub fn router(app: Arc<App>) -> Router {
     Router::new()
+        .route("/healthz", get(|| async { StatusCode::OK }))
         .route("/", get(home))
         .route("/{page}", get(page))
         .route(
@@ -203,10 +200,12 @@ async fn validate_plants(app: &App, ids: &[String]) -> Result<()> {
         return Err(ApiError::bad("Select at most 100 plants"));
     }
     for id in ids {
-        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM plants WHERE id=?)")
-            .bind(id)
-            .fetch_one(&app.pool)
-            .await?;
+        let exists: bool = db::query_scalar(
+            "SELECT CASE WHEN EXISTS(SELECT 1 FROM plants WHERE id=?) THEN 1 ELSE 0 END",
+        )
+        .bind(id)
+        .fetch_one(&app.pool)
+        .await?;
         if !exists {
             return Err(ApiError::bad("A selected plant does not exist"));
         }
@@ -214,25 +213,28 @@ async fn validate_plants(app: &App, ids: &[String]) -> Result<()> {
     Ok(())
 }
 async fn summary(State(app): State<Arc<App>>) -> Result<Json<Value>> {
-    let latest:Option<Reading>=sqlx::query_as("SELECT recorded_at,temperature_c,humidity_percent FROM readings ORDER BY recorded_at DESC LIMIT 1").fetch_optional(&app.pool).await?;
-    let health: Vec<Health> = sqlx::query_as("SELECT * FROM health")
+    let latest:Option<Reading>=db::query_as("SELECT recorded_at,temperature_c,humidity_percent FROM readings ORDER BY recorded_at DESC LIMIT 1").sql_server("SELECT TOP (1) recorded_at,temperature_c,humidity_percent FROM readings ORDER BY recorded_at DESC").fetch_optional(&app.pool).await?;
+    let health: Vec<Health> = db::query_as("SELECT * FROM health")
         .fetch_all(&app.pool)
         .await?;
-    let counts: (i64,i64,i64)=sqlx::query_as("SELECT (SELECT COUNT(*) FROM plants WHERE archived=0),(SELECT COUNT(*) FROM entries),(SELECT COUNT(*) FROM photos)").fetch_one(&app.pool).await?;
+    let counts: (i64,i64,i64)=db::query_as("SELECT (SELECT COUNT(*) FROM plants WHERE archived=0),(SELECT COUNT(*) FROM entries),(SELECT COUNT(*) FROM photos)").fetch_one(&app.pool).await?;
     Ok(Json(
-        json!({"active_plants":counts.0,"entries":counts.1,"photos":counts.2,"sensor_stale":automation::reading_stale(latest.as_ref(),Utc::now().timestamp()),"latest_reading":latest,"health":health,"sensor_adapter":app.config.sensor.adapter,"camera_adapter":app.config.camera.adapter,"settings":store::settings(&app.pool).await?}),
+        json!({"database_backend":app.pool.backend(),"active_plants":counts.0,"entries":counts.1,"photos":counts.2,"sensor_stale":automation::reading_stale(latest.as_ref(),Utc::now().timestamp()),"latest_reading":latest,"health":health,"sensor_adapter":app.config.sensor.adapter,"camera_adapter":app.config.camera.adapter,"settings":store::settings(&app.pool).await?}),
     ))
 }
 async fn plants(State(app): State<Arc<App>>) -> Result<Json<Vec<Plant>>> {
     Ok(Json(
-        sqlx::query_as("SELECT * FROM plants ORDER BY archived,name COLLATE NOCASE")
+        db::query_as("SELECT * FROM plants ORDER BY archived,name COLLATE NOCASE")
+            .sql_server(
+                "SELECT * FROM plants ORDER BY archived,name COLLATE Latin1_General_100_CI_AS_SC",
+            )
             .fetch_all(&app.pool)
             .await?,
     ))
 }
 async fn plant(State(app): State<Arc<App>>, Path(id): Path<String>) -> Result<Json<Plant>> {
     Ok(Json(
-        sqlx::query_as("SELECT * FROM plants WHERE id=?")
+        db::query_as("SELECT * FROM plants WHERE id=?")
             .bind(id)
             .fetch_optional(&app.pool)
             .await?
@@ -254,17 +256,15 @@ async fn create_plant(
     let id = store::id();
     let now = Utc::now().timestamp();
     let mut tx = app.pool.begin().await?;
-    sqlx::query(
-        "INSERT INTO plants(id,name,species,notes,archived,created_at) VALUES(?,?,?,?,?,?)",
-    )
-    .bind(&id)
-    .bind(input.name.trim())
-    .bind(&input.species)
-    .bind(&input.notes)
-    .bind(input.archived)
-    .bind(now)
-    .execute(&mut *tx)
-    .await?;
+    db::query("INSERT INTO plants(id,name,species,notes,archived,created_at) VALUES(?,?,?,?,?,?)")
+        .bind(&id)
+        .bind(input.name.trim())
+        .bind(&input.species)
+        .bind(&input.notes)
+        .bind(input.archived)
+        .bind(now)
+        .execute(&mut tx)
+        .await?;
     store::event(
         &mut tx,
         "plant",
@@ -284,19 +284,19 @@ async fn update_plant(
     Json(input): Json<PlantInput>,
 ) -> Result<Json<Value>> {
     check_plant(&input)?;
-    let previous: Plant = sqlx::query_as("SELECT * FROM plants WHERE id=?")
+    let previous: Plant = db::query_as("SELECT * FROM plants WHERE id=?")
         .bind(&id)
         .fetch_optional(&app.pool)
         .await?
         .ok_or_else(ApiError::missing)?;
     let mut tx = app.pool.begin().await?;
-    sqlx::query("UPDATE plants SET name=?,species=?,notes=?,archived=? WHERE id=?")
+    db::query("UPDATE plants SET name=?,species=?,notes=?,archived=? WHERE id=?")
         .bind(input.name.trim())
         .bind(&input.species)
         .bind(&input.notes)
         .bind(input.archived)
         .bind(&id)
-        .execute(&mut *tx)
+        .execute(&mut tx)
         .await?;
     if input.archived != previous.archived {
         store::event(
@@ -329,12 +329,15 @@ async fn entries(
     State(app): State<Arc<App>>,
     Query(filter): Query<Filter>,
 ) -> Result<Json<Vec<Entry>>> {
-    let mut items:Vec<Entry>=sqlx::query_as("SELECT e.* FROM entries e WHERE (? IS NULL OR EXISTS(SELECT 1 FROM entry_plants p WHERE p.entry_id=e.id AND p.plant_id=?)) ORDER BY occurred_at DESC").bind(&filter.plant).bind(&filter.plant).fetch_all(&app.pool).await?;
+    let mut items:Vec<Entry>=db::query_as("SELECT e.* FROM entries e WHERE (? IS NULL OR EXISTS(SELECT 1 FROM entry_plants p WHERE p.entry_id=e.id AND p.plant_id=?)) ORDER BY occurred_at DESC").bind(&filter.plant).bind(&filter.plant).fetch_all(&app.pool).await?;
+    let mut links = store::plant_links(
+        &app.pool,
+        store::LinkKind::Entry,
+        &items.iter().map(|item| item.id.clone()).collect::<Vec<_>>(),
+    )
+    .await?;
     for item in &mut items {
-        item.plant_ids = sqlx::query_scalar("SELECT plant_id FROM entry_plants WHERE entry_id=?")
-            .bind(&item.id)
-            .fetch_all(&app.pool)
-            .await?;
+        item.plant_ids = links.remove(&item.id).unwrap_or_default();
     }
     Ok(Json(items))
 }
@@ -350,41 +353,41 @@ async fn save_entry(app: &App, id: &str, input: EntryInput, existing: bool) -> R
     }
     let mut tx = app.pool.begin().await?;
     if existing {
-        if sqlx::query("UPDATE entries SET kind=?,body=?,occurred_at=? WHERE id=?")
+        if db::query("UPDATE entries SET kind=?,body=?,occurred_at=? WHERE id=?")
             .bind(&input.kind)
             .bind(&input.body)
             .bind(input.occurred_at)
             .bind(id)
-            .execute(&mut *tx)
+            .execute(&mut tx)
             .await?
             .rows_affected()
             == 0
         {
             return Err(ApiError::missing());
         }
-        sqlx::query("DELETE FROM entry_plants WHERE entry_id=?")
+        db::query("DELETE FROM entry_plants WHERE entry_id=?")
             .bind(id)
-            .execute(&mut *tx)
+            .execute(&mut tx)
             .await?;
-        sqlx::query("DELETE FROM events WHERE entity_id=?")
+        db::query("DELETE FROM events WHERE entity_id=?")
             .bind(id)
-            .execute(&mut *tx)
+            .execute(&mut tx)
             .await?;
     } else {
-        sqlx::query("INSERT INTO entries(id,kind,body,occurred_at,created_at) VALUES(?,?,?,?,?)")
+        db::query("INSERT INTO entries(id,kind,body,occurred_at,created_at) VALUES(?,?,?,?,?)")
             .bind(id)
             .bind(&input.kind)
             .bind(&input.body)
             .bind(input.occurred_at)
             .bind(Utc::now().timestamp())
-            .execute(&mut *tx)
+            .execute(&mut tx)
             .await?;
     }
     for plant in &input.plant_ids {
-        sqlx::query("INSERT OR IGNORE INTO entry_plants(entry_id,plant_id) VALUES(?,?)")
+        db::query("INSERT OR IGNORE INTO entry_plants(entry_id,plant_id) VALUES(?,?)").sql_server("INSERT INTO entry_plants(entry_id,plant_id) SELECT @P1,@P2 WHERE NOT EXISTS(SELECT 1 FROM entry_plants WITH (UPDLOCK,HOLDLOCK) WHERE entry_id=@P1 AND plant_id=@P2)")
             .bind(id)
             .bind(plant)
-            .execute(&mut *tx)
+            .execute(&mut tx)
             .await?;
     }
     store::event(
@@ -418,18 +421,18 @@ async fn update_entry(
 }
 async fn delete_entry(State(app): State<Arc<App>>, Path(id): Path<String>) -> Result<StatusCode> {
     let mut tx = app.pool.begin().await?;
-    if sqlx::query("DELETE FROM entries WHERE id=?")
+    if db::query("DELETE FROM entries WHERE id=?")
         .bind(&id)
-        .execute(&mut *tx)
+        .execute(&mut tx)
         .await?
         .rows_affected()
         == 0
     {
         return Err(ApiError::missing());
     }
-    sqlx::query("DELETE FROM events WHERE entity_id=?")
+    db::query("DELETE FROM events WHERE entity_id=?")
         .bind(&id)
-        .execute(&mut *tx)
+        .execute(&mut tx)
         .await?;
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
@@ -457,12 +460,15 @@ async fn calendar(
     ))
 }
 async fn photos(State(app): State<Arc<App>>, Query(q): Query<Filter>) -> Result<Json<Vec<Photo>>> {
-    let mut items:Vec<Photo>=sqlx::query_as("SELECT p.* FROM photos p WHERE (? IS NULL OR EXISTS(SELECT 1 FROM photo_plants pp WHERE pp.photo_id=p.id AND pp.plant_id=?)) ORDER BY captured_at DESC").bind(&q.plant).bind(&q.plant).fetch_all(&app.pool).await?;
+    let mut items:Vec<Photo>=db::query_as("SELECT p.* FROM photos p WHERE (? IS NULL OR EXISTS(SELECT 1 FROM photo_plants pp WHERE pp.photo_id=p.id AND pp.plant_id=?)) ORDER BY captured_at DESC").bind(&q.plant).bind(&q.plant).fetch_all(&app.pool).await?;
+    let mut links = store::plant_links(
+        &app.pool,
+        store::LinkKind::Photo,
+        &items.iter().map(|item| item.id.clone()).collect::<Vec<_>>(),
+    )
+    .await?;
     for item in &mut items {
-        item.plant_ids = sqlx::query_scalar("SELECT plant_id FROM photo_plants WHERE photo_id=?")
-            .bind(&item.id)
-            .fetch_all(&app.pool)
-            .await?;
+        item.plant_ids = links.remove(&item.id).unwrap_or_default();
     }
     Ok(Json(items))
 }
@@ -483,7 +489,7 @@ async fn capture(
     let plants = match input.plant_ids {
         Some(ids) => ids,
         None => {
-            sqlx::query_scalar("SELECT id FROM plants WHERE archived=0")
+            db::query_scalar("SELECT id FROM plants WHERE archived=0")
                 .fetch_all(&app.pool)
                 .await?
         }
@@ -510,37 +516,39 @@ async fn link_photo(
     Json(input): Json<PhotoLinks>,
 ) -> Result<StatusCode> {
     validate_plants(&app, &input.plant_ids).await?;
-    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM photos WHERE id=?)")
-        .bind(&id)
-        .fetch_one(&app.pool)
-        .await?;
+    let exists: bool = db::query_scalar(
+        "SELECT CASE WHEN EXISTS(SELECT 1 FROM photos WHERE id=?) THEN 1 ELSE 0 END",
+    )
+    .bind(&id)
+    .fetch_one(&app.pool)
+    .await?;
     if !exists {
         return Err(ApiError::missing());
     }
     let mut tx = app.pool.begin().await?;
-    sqlx::query("DELETE FROM photo_plants WHERE photo_id=?")
+    db::query("DELETE FROM photo_plants WHERE photo_id=?")
         .bind(&id)
-        .execute(&mut *tx)
+        .execute(&mut tx)
         .await?;
-    sqlx::query(
+    db::query(
         "DELETE FROM event_plants WHERE event_id IN (SELECT id FROM events WHERE entity_id=?)",
     )
     .bind(&id)
-    .execute(&mut *tx)
+    .execute(&mut tx)
     .await?;
     for plant in &input.plant_ids {
-        sqlx::query("INSERT OR IGNORE INTO photo_plants(photo_id,plant_id) VALUES(?,?)")
+        db::query("INSERT OR IGNORE INTO photo_plants(photo_id,plant_id) VALUES(?,?)").sql_server("INSERT INTO photo_plants(photo_id,plant_id) SELECT @P1,@P2 WHERE NOT EXISTS(SELECT 1 FROM photo_plants WITH (UPDLOCK,HOLDLOCK) WHERE photo_id=@P1 AND plant_id=@P2)")
             .bind(&id)
             .bind(plant)
-            .execute(&mut *tx)
+            .execute(&mut tx)
             .await?;
-        sqlx::query("INSERT OR IGNORE INTO event_plants(event_id,plant_id) SELECT id,? FROM events WHERE entity_id=?").bind(plant).bind(&id).execute(&mut *tx).await?;
+        db::query("INSERT OR IGNORE INTO event_plants(event_id,plant_id) SELECT id,? FROM events WHERE entity_id=?").sql_server("INSERT INTO event_plants(event_id,plant_id) SELECT e.id,@P1 FROM events e WHERE e.entity_id=@P2 AND NOT EXISTS(SELECT 1 FROM event_plants p WITH (UPDLOCK,HOLDLOCK) WHERE p.event_id=e.id AND p.plant_id=@P1)").bind(plant).bind(&id).execute(&mut tx).await?;
     }
     tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }
 async fn photo_image(State(app): State<Arc<App>>, Path(id): Path<String>) -> Result<Response> {
-    let filename: String = sqlx::query_scalar("SELECT filename FROM photos WHERE id=?")
+    let filename: String = db::query_scalar("SELECT filename FROM photos WHERE id=?")
         .bind(id)
         .fetch_optional(&app.pool)
         .await?
@@ -563,19 +571,19 @@ async fn photo_image(State(app): State<Arc<App>>, Path(id): Path<String>) -> Res
 }
 async fn delete_photo(State(app): State<Arc<App>>, Path(id): Path<String>) -> Result<StatusCode> {
     let _lock = app.capture_lock.lock().await;
-    let filename: String = sqlx::query_scalar("SELECT filename FROM photos WHERE id=?")
+    let filename: String = db::query_scalar("SELECT filename FROM photos WHERE id=?")
         .bind(&id)
         .fetch_optional(&app.pool)
         .await?
         .ok_or_else(ApiError::missing)?;
     let mut tx = app.pool.begin().await?;
-    sqlx::query("DELETE FROM photos WHERE id=?")
+    db::query("DELETE FROM photos WHERE id=?")
         .bind(&id)
-        .execute(&mut *tx)
+        .execute(&mut tx)
         .await?;
-    sqlx::query("DELETE FROM events WHERE entity_id=?")
+    db::query("DELETE FROM events WHERE entity_id=?")
         .bind(&id)
-        .execute(&mut *tx)
+        .execute(&mut tx)
         .await?;
     tx.commit().await?;
     match tokio::fs::remove_file(app.config.data_dir.join("photos").join(filename)).await {
@@ -599,10 +607,10 @@ async fn readings(
     if start >= end || end.saturating_sub(start) > 31 * 86400 {
         return Err(ApiError::bad("Choose a reading range of at most 31 days"));
     }
-    Ok(Json(sqlx::query_as("SELECT recorded_at,temperature_c,humidity_percent FROM readings WHERE recorded_at>=? AND recorded_at<? ORDER BY recorded_at").bind(start).bind(end).fetch_all(&app.pool).await?))
+    Ok(Json(db::query_as("SELECT recorded_at,temperature_c,humidity_percent FROM readings WHERE recorded_at>=? AND recorded_at<? ORDER BY recorded_at").bind(start).bind(end).fetch_all(&app.pool).await?))
 }
 async fn devices(State(app): State<Arc<App>>) -> Result<Json<Value>> {
-    let mut devices: Vec<Device> = sqlx::query_as("SELECT * FROM devices ORDER BY name")
+    let mut devices: Vec<Device> = db::query_as("SELECT * FROM devices ORDER BY name")
         .fetch_all(&app.pool)
         .await?;
     for device in &mut devices {
@@ -613,10 +621,10 @@ async fn devices(State(app): State<Arc<App>>) -> Result<Json<Value>> {
             device.reported_on = None;
         }
     }
-    let schedules: Vec<Schedule> = sqlx::query_as("SELECT * FROM schedules")
+    let schedules: Vec<Schedule> = db::query_as("SELECT * FROM schedules")
         .fetch_all(&app.pool)
         .await?;
-    let overrides: Vec<Override> = sqlx::query_as("SELECT * FROM overrides")
+    let overrides: Vec<Override> = db::query_as("SELECT * FROM overrides")
         .fetch_all(&app.pool)
         .await?;
     Ok(Json(
@@ -659,26 +667,26 @@ async fn create_device(
     validate_device(&input)?;
     let id = store::id();
     let mut tx = app.pool.begin().await?;
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM devices")
-        .fetch_one(&mut *tx)
+    let count: i64 = db::query_scalar("SELECT COUNT(*) FROM devices")
+        .fetch_one(&mut tx)
         .await?;
     if count >= 8 {
         return Err(ApiError::bad(
             "This grow space supports up to eight outlets",
         ));
     }
-    sqlx::query("INSERT INTO devices(id,name,role,adapter,address,channel) VALUES(?,?,?,?,?,?)")
+    db::query("INSERT INTO devices(id,name,role,adapter,address,channel) VALUES(?,?,?,?,?,?)")
         .bind(&id)
         .bind(input.name.trim())
         .bind(input.role)
         .bind(input.adapter)
         .bind(input.address.trim_end_matches('/'))
         .bind(input.channel)
-        .execute(&mut *tx)
+        .execute(&mut tx)
         .await?;
-    sqlx::query("INSERT INTO schedules(device_id) VALUES(?)")
+    db::query("INSERT INTO schedules(device_id) VALUES(?)")
         .bind(&id)
-        .execute(&mut *tx)
+        .execute(&mut tx)
         .await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(json!({"id":id}))))
@@ -690,7 +698,7 @@ async fn update_device(
 ) -> Result<StatusCode> {
     validate_device(&input)?;
     let _lock = app.control_lock.lock().await;
-    let previous: Device = sqlx::query_as("SELECT * FROM devices WHERE id=?")
+    let previous: Device = db::query_as("SELECT * FROM devices WHERE id=?")
         .bind(&id)
         .fetch_optional(&app.pool)
         .await?
@@ -699,25 +707,25 @@ async fn update_device(
         || previous.address != input.address.trim_end_matches('/')
         || previous.channel != input.channel;
     let mut tx = app.pool.begin().await?;
-    sqlx::query("UPDATE devices SET name=?,role=?,adapter=?,address=?,channel=? WHERE id=?")
+    db::query("UPDATE devices SET name=?,role=?,adapter=?,address=?,channel=? WHERE id=?")
         .bind(input.name.trim())
         .bind(input.role)
         .bind(input.adapter)
         .bind(input.address.trim_end_matches('/'))
         .bind(input.channel)
         .bind(&id)
-        .execute(&mut *tx)
+        .execute(&mut tx)
         .await?;
     if changed {
-        sqlx::query("UPDATE schedules SET enabled=0 WHERE device_id=?")
+        db::query("UPDATE schedules SET enabled=0 WHERE device_id=?")
             .bind(&id)
-            .execute(&mut *tx)
+            .execute(&mut tx)
             .await?;
-        sqlx::query("DELETE FROM overrides WHERE device_id=?")
+        db::query("DELETE FROM overrides WHERE device_id=?")
             .bind(&id)
-            .execute(&mut *tx)
+            .execute(&mut tx)
             .await?;
-        sqlx::query("UPDATE devices SET commanded_on=NULL,reported_on=NULL,checked_at=NULL,last_error=NULL WHERE id=?").bind(&id).execute(&mut *tx).await?;
+        db::query("UPDATE devices SET commanded_on=NULL,reported_on=NULL,checked_at=NULL,last_error=NULL WHERE id=?").bind(&id).execute(&mut tx).await?;
     }
     store::event(
         &mut tx,
@@ -742,6 +750,7 @@ async fn schedule(
     Path(id): Path<String>,
     Json(input): Json<Schedule>,
 ) -> Result<StatusCode> {
+    require_automation(&app)?;
     if input.device_id != id
         || automation::parse_time(&input.start_time).is_err()
         || automation::parse_time(&input.end_time).is_err()
@@ -752,7 +761,7 @@ async fn schedule(
         ));
     }
     let _lock = app.control_lock.lock().await;
-    if sqlx::query("UPDATE schedules SET enabled=?,start_time=?,end_time=? WHERE device_id=?")
+    if db::query("UPDATE schedules SET enabled=?,start_time=?,end_time=? WHERE device_id=?")
         .bind(input.enabled)
         .bind(input.start_time)
         .bind(input.end_time)
@@ -784,18 +793,21 @@ async fn set_override(
     Path(id): Path<String>,
     Json(input): Json<OverrideInput>,
 ) -> Result<StatusCode> {
+    require_automation(&app)?;
     if !(1..=1440).contains(&input.minutes) {
         return Err(ApiError::bad("Override must last 1–1440 minutes"));
     }
     let _lock = app.control_lock.lock().await;
-    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM devices WHERE id=?)")
-        .bind(&id)
-        .fetch_one(&app.pool)
-        .await?;
+    let exists: bool = db::query_scalar(
+        "SELECT CASE WHEN EXISTS(SELECT 1 FROM devices WHERE id=?) THEN 1 ELSE 0 END",
+    )
+    .bind(&id)
+    .fetch_one(&app.pool)
+    .await?;
     if !exists {
         return Err(ApiError::missing());
     }
-    sqlx::query("INSERT INTO overrides(device_id,on_state,expires_at) VALUES(?,?,?) ON CONFLICT(device_id) DO UPDATE SET on_state=excluded.on_state,expires_at=excluded.expires_at").bind(&id).bind(input.on).bind(Utc::now().timestamp()+input.minutes*60).execute(&app.pool).await?;
+    db::query("INSERT INTO overrides(device_id,on_state,expires_at) VALUES(?,?,?) ON CONFLICT(device_id) DO UPDATE SET on_state=excluded.on_state,expires_at=excluded.expires_at").sql_server("MERGE overrides WITH (HOLDLOCK) AS target USING (SELECT @P1 device_id,@P2 on_state,@P3 expires_at) AS src ON target.device_id=src.device_id WHEN MATCHED THEN UPDATE SET on_state=src.on_state,expires_at=src.expires_at WHEN NOT MATCHED THEN INSERT(device_id,on_state,expires_at) VALUES(src.device_id,src.on_state,src.expires_at);").bind(&id).bind(input.on).bind(Utc::now().timestamp()+input.minutes*60).execute(&app.pool).await?;
     store::log_event(
         &app.pool,
         "system",
@@ -812,16 +824,19 @@ async fn set_override(
     Ok(StatusCode::ACCEPTED)
 }
 async fn resume(State(app): State<Arc<App>>, Path(id): Path<String>) -> Result<StatusCode> {
+    require_automation(&app)?;
     let _lock = app.control_lock.lock().await;
-    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM devices WHERE id=?)")
-        .bind(&id)
-        .fetch_one(&app.pool)
-        .await?;
+    let exists: bool = db::query_scalar(
+        "SELECT CASE WHEN EXISTS(SELECT 1 FROM devices WHERE id=?) THEN 1 ELSE 0 END",
+    )
+    .bind(&id)
+    .fetch_one(&app.pool)
+    .await?;
     if !exists {
         return Err(ApiError::missing());
     }
     // Expire, don't remove: the controller must turn off if there is no enabled schedule.
-    sqlx::query("UPDATE overrides SET expires_at=0 WHERE device_id=?")
+    db::query("UPDATE overrides SET expires_at=0 WHERE device_id=?")
         .bind(&id)
         .execute(&app.pool)
         .await?;
@@ -836,6 +851,16 @@ async fn resume(State(app): State<Arc<App>>, Path(id): Path<String>) -> Result<S
     .await?;
     Ok(StatusCode::ACCEPTED)
 }
+fn require_automation(app: &App) -> Result<()> {
+    if !app.config.automation_enabled {
+        return Err(ApiError(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "Equipment control is unavailable on this web-only instance".into(),
+        ));
+    }
+    Ok(())
+}
+
 async fn settings(State(app): State<Arc<App>>) -> Result<Json<Settings>> {
     Ok(Json(store::settings(&app.pool).await?))
 }
@@ -854,7 +879,7 @@ async fn update_settings(
         return Err(ApiError::bad("Camera adapter is disabled"));
     }
     let _lock = app.control_lock.lock().await;
-    sqlx::query("UPDATE settings SET timezone=?,photo_enabled=?,photo_time=? WHERE id=1")
+    db::query("UPDATE settings SET timezone=?,photo_enabled=?,photo_time=? WHERE id=1")
         .bind(tz.name())
         .bind(input.photo_enabled)
         .bind(input.photo_time)

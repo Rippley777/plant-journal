@@ -1,10 +1,10 @@
 # Fieldnotes · Plant Journal
 
-A Rust application for a Raspberry Pi 4 grow space: individual plant journals, a combined calendar, daily photographs, environmental history, and local light/fan controls. Everything runs on the local network. The sPlant watering kit keeps its own timer; journal watering entries describe care you confirm yourself.
+A Rust application for a Raspberry Pi 4 grow space: individual plant journals, a combined calendar, daily photographs, environmental history, and local light/fan controls. The Pi hosts the interface and hardware controls; journal data can live in hosted Azure SQL, with SQLite available for offline development. The sPlant watering kit keeps its own timer; journal watering entries describe care you confirm yourself.
 
 ## Try it on your computer
 
-Requires Rust **1.86 or newer** and a C compiler. No Node.js, cloud account, separate database server, or physical hardware is needed.
+Requires Rust **1.86 or newer** and a C compiler. This quick start uses offline SQLite development mode; no cloud account, Node.js, separate database server, or physical hardware is needed.
 
 ```sh
 cargo run --locked
@@ -12,9 +12,13 @@ cargo run --locked
 
 Open **http://127.0.0.1:3000**. This starts with simulated sensor readings and a clearly labeled simulated camera. Add plants, write an entry, capture a photo, and try a simulated light or fan in Equipment. No example plants or journal records are inserted automatically. Sensor samples arrive once a minute; equipment is checked about every ten seconds.
 
-The SQLite database and photos are created in `data/`. Assets and templates are compiled into the binary. Do not run multiple service instances against the same data directory.
+In this offline mode, the SQLite database and photos are created in `data/`. Assets and templates are compiled into the binary. Do not run multiple service instances against the same data directory.
 
-To configure the service:
+**For hosted Azure SQL:** follow [Azure SQL setup and migration](docs/azure-sql.md) using `config.azure.example.toml`. The Pi deployment example selects Azure SQL; photos remain local. Existing SQLite journals can be copied with `--import-sqlite` without changing the source.
+
+**For cloud web hosting:** [build and publish the Linux container to Azure Container Registry](docs/azure-container.md). The included cloud configuration disables hardware automation; it does not replace the Pi controller.
+
+To configure offline development:
 
 ```sh
 cp config.example.toml config.toml
@@ -39,6 +43,8 @@ All automation starts disabled. Settings initially use `America/Chicago` and a n
 
 Use Raspberry Pi OS Lite **64-bit**, a suitable Pi 4 power supply, and reliable storage. Keep the computer and electrical switching equipment away from water. The application does not require a separate microcontroller.
 
+First configure your database and credentials using [the Azure SQL guide](docs/azure-sql.md). The supplied deployment TOML selects Azure SQL and the service reads `/etc/plant-journal/azure.env`. To keep an offline SQLite deployment, explicitly change `[database] backend` to `"sqlite"`.
+
 On the Pi, install Rust 1.86+ using your preferred supported toolchain, then build the repository **on the Pi** (a macOS binary will not run on Linux):
 
 ```sh
@@ -51,6 +57,9 @@ sudo install -d -m 750 /etc/plant-journal
 sudo install -m 640 -o root -g plant-journal deploy/config.toml /etc/plant-journal/config.toml
 sudo install -m 644 deploy/plant-journal.service /etc/systemd/system/plant-journal.service
 sudo systemctl daemon-reload
+# For Azure mode, create /etc/plant-journal/azure.env before starting the service:
+# sudo install -m 600 -o root -g root deploy/azure.env.example /etc/plant-journal/azure.env
+# sudoedit /etc/plant-journal/azure.env
 sudo systemctl enable --now plant-journal
 ```
 
@@ -61,7 +70,7 @@ sudo systemctl status plant-journal
 sudo journalctl -u plant-journal -f
 ```
 
-Edit `/etc/plant-journal/config.toml` and restart the service to change hardware adapters. UI settings (timezone, photos, equipment, schedules) persist in SQLite. Dependency versions are committed in `Cargo.lock`; use `--locked` for reproducible builds. The lockfile pins a compatible `yoke-derive` patch for Rust 1.86.
+Edit `/etc/plant-journal/config.toml` and restart the service to change hardware adapters. UI settings (timezone, photos, equipment, schedules) persist in the configured database. Dependency versions are committed in `Cargo.lock`; use `--locked` for reproducible builds. The lockfile pins a compatible `yoke-derive` patch for Rust 1.86.
 
 ### DHT11 / DHT22 starter-kit sensor
 
@@ -98,7 +107,7 @@ ffmpeg -f v4l2 -input_format mjpeg -video_size 1280x720 -i /dev/video0 -frames:v
 
 Use a format and size listed by your camera. Select its stable `/dev/v4l/by-id/...-video-index0` path in the config, set `[camera] adapter = "v4l2"`, and restart. The systemd service has `video` group access. Adjust any physical ring light before leaving the camera in the grow space.
 
-Capture writes a temporary image, syncs it, and renames it before committing a photo record. A failed capture removes partial files, reports failure, and does not produce a successful photo event. There is no automatic photo deletion. Monitor available storage with `df -h /var/lib/plant-journal`; full storage is reported as an error. Backup and cleanup should be part of normal operation.
+Capture writes a temporary image, syncs it, and renames it before committing a photo record. A failed capture removes partial files and reports failure. If a finalized image’s database commit cannot be confirmed, the image is retained for reconciliation; the server may have committed despite a lost acknowledgement. There is no automatic photo deletion. Monitor available storage with `df -h /var/lib/plant-journal`; full storage is reported as an error. Backup and cleanup should be part of normal operation.
 
 Reference: [FFmpeg V4L2 documentation](https://ffmpeg.org/ffmpeg-devices.html#video4linux2_002c-v4l2).
 
@@ -106,9 +115,9 @@ Reference: [FFmpeg V4L2 documentation](https://ffmpeg.org/ffmpeg-devices.html#vi
 
 Use enclosed outlets whose specifications cover the **actual LED load/inrush and fan motor load**. A general wattage rating alone does not establish motor or LED-driver suitability. Verify your inline fan's model/rating before connecting it. This app provides on/off switching, not speed control or dimming.
 
-The Shelly adapter supports devices with local Gen2+ RPC methods `Switch.GetStatus` and `Switch.Set`. Configure the outlet's Wi-Fi through its own setup flow, reserve its local IP in your router, and enter `http://<outlet-address>` and switch channel (usually `0`) under Equipment. Cloud access is unnecessary. This adapter currently requires local RPC without authentication; it does **not** implement Shelly Digest authentication. Authenticated outlets fail visibly instead of appearing connected.
+The Shelly adapter supports devices with local Gen2+ RPC methods `Switch.GetStatus` and `Switch.Set`. Configure the outlet's Wi-Fi through its own setup flow, reserve its local IP in your router, and enter `http://<outlet-address>` and switch channel (usually `0`) under Equipment. The outlet itself does not require cloud access; Azure database mode still needs internet connectivity. This adapter currently requires local RPC without authentication; it does **not** implement Shelly Digest authentication. Authenticated outlets fail visibly instead of appearing connected.
 
-Add and test a **simulated** outlet first. For a physical outlet, verify status and short manual on/off overrides with the intended load before enabling schedules. Set and verify the outlet's own power-on behavior in its configuration. The Pi cannot guarantee switching during a network outage or power failure; a device may retain its last state. Schedule operation depends on a working Pi, local network, and correct clock. Test the installation with the WAN disconnected while keeping LAN/Wi-Fi and power available.
+Add and test a **simulated** outlet first. For a physical outlet, verify status and short manual on/off overrides with the intended load before enabling schedules. Set and verify the outlet's own power-on behavior in its configuration. The Pi cannot guarantee switching during a network outage or power failure; a device may retain its last state. Schedule operation depends on a working Pi, local network, and correct clock. In SQLite mode, test with the WAN disconnected while keeping LAN/Wi-Fi and power available. In Azure mode, a database outage suspends database-backed control; read the [availability behavior](docs/azure-sql.md#availability-and-recovery) before enabling equipment.
 
 Reference: [Shelly Switch RPC](https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Switch/).
 
@@ -125,9 +134,11 @@ Leave the sPlant kit on its own timer. The matching LCD kit's manual describes o
 - On restart, current intended state is reconciled; missed transitions are never replayed. At daylight-saving changes, switching follows current local wall time.
 - A daily photo is attempted only during its configured minute. A missed minute, including a nonexistent DST time, is skipped. A persistent claim allows at most one scheduled attempt per local date, even if the clock goes backward or the process restarts. Failed attempts require **Capture now** or the following day's run; they do not retry automatically. Changing timezone does not erase previous date claims.
 - Sensor polling, photos, and equipment control use independent tasks. Camera errors do not stop schedules. Component failures are recorded on change rather than once per polling cycle.
-- No data migration steps are needed for a new installation. Embedded SQLite migrations run automatically at startup. Back up before upgrading.
+- No data migration steps are needed for a new installation. Embedded backend-specific migrations run automatically at startup unless Azure migrations are explicitly disabled. Back up before upgrading.
 
 ## Backup and restore
+
+**Azure mode:** use [Azure database and local photo backup guidance](docs/azure-sql.md#backups). The commands below back up a **SQLite installation only**; copying the Pi’s directory does not back up a hosted Azure SQL database.
 
 Back up **both the database and photos together**, and keep the configuration file. Stop the service for the whole copy so the database cannot reference photos that were omitted. Stopping the service leaves outlets in their last state; choose an appropriate time for this maintenance.
 
@@ -190,7 +201,9 @@ cargo test --locked
 node --check static/app.js  # optional development check; Node is not needed to run the app
 ```
 
-The integration suite uses temporary databases, simulated/failing adapters, injected UTC times, and a local mock Shelly server. It covers journal persistence and archival, calendar timezones, shared photo links, duplicate prevention across restarts, DST, overrides, outlet timeouts, failed sensor reads/captures/writes, and database/photo restoration.
+The integration suite uses temporary SQLite databases, simulated/failing adapters, injected UTC times, and a local mock Shelly server. It covers journal persistence and archival, calendar timezones, shared photo links, duplicate prevention across restarts, DST, overrides, outlet timeouts, failed sensor reads/captures/writes, and database/photo restoration.
+
+Additional database tests cover the shared execution layer, parameter binding, transaction rollback, and SQLite import. An opt-in [Azure SQL contract test](docs/azure-sql.md#tests) requires a dedicated hosted test database.
 
 Physical Pi sensor, Kiyo, and outlet checks must be performed on the actual equipment. Automated tests cannot verify GPIO wiring, camera format support, load ratings, or the physical operation of connected equipment.
 

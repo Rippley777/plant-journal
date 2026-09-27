@@ -1,0 +1,34 @@
+# Allow only build inputs. Everything else, including .git, .env, config.toml,
+# local data/photos, backups, credentials, target/, and editor files, is excluded.
+**
+!Dockerfile
+!.dockerignore
+!Cargo.toml
+!Cargo.lock
+!.cargo/
+.cargo/**
+!.cargo/config.toml
+!src/
+!src/**
+!static/
+!static/**
+!templates/
+!templates/**
+!migrations/
+!migrations/**
+!tests/
+tests/**
+!tests/*.rs
+!deploy/
+deploy/**
+!deploy/config.cloud.toml
+# Defense in depth for sensitive files accidentally placed within source folders.
+**/.env
+**/.env.*
+**/*.env
+**/*.pem
+**/*.key
+**/*.pfx
+**/*.sqlite*
+**/data
+**/photos

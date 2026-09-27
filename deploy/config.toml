@@ -1,6 +1,11 @@
 bind = "0.0.0.0:3000"
 data_dir = "/var/lib/plant-journal"
 
+[database]
+backend = "azure_sql"
+# Server, database, and credentials come from /etc/plant-journal/azure.env.
+migrate = true
+
 [sensor]
 # Change to iio after testing the sensor.
 adapter = "simulated"

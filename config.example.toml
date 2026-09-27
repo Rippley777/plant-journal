@@ -3,6 +3,11 @@
 bind = "127.0.0.1:3000"
 data_dir = "data"
 
+[database]
+# This configuration is the offline development mode.
+# Use config.azure.example.toml for the hosted Azure SQL database.
+backend = "sqlite"
+
 [sensor]
 # simulated | iio | disabled
 adapter = "simulated"
