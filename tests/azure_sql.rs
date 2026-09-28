@@ -277,6 +277,88 @@ async fn azure_sql_end_to_end_contract() {
     )
     .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
+    // Seed vault metadata, optional result bindings, and composite origin constraints.
+    let (status, packet) = request(&router,"POST","/api/v1/seeds",Some(json!({"name":"Vault packet","quantity":1,"unit":"packets","breeder":"Test breeder","acquired_on":"2026-09-27","packet_code":"Lot A"}))).await;
+    assert_eq!(status, StatusCode::CREATED, "{packet}");
+    let seed_id = packet["id"].as_str().unwrap();
+    let attempt_path = format!("/api/v1/seeds/{seed_id}/attempts");
+    let (status, attempt) = request(
+        &router,
+        "POST",
+        &attempt_path,
+        Some(json!({"started_on":"2026-09-27","seeds_sown":4})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{attempt}");
+    let germination_id = attempt["id"].as_str().unwrap();
+    let attempt_path = format!("{attempt_path}/{germination_id}");
+    assert_eq!(
+        request(
+            &router,
+            "PUT",
+            &attempt_path,
+            Some(json!({"started_on":"2026-09-27","seeds_sown":4,"seeds_germinated":3}))
+        )
+        .await
+        .0,
+        StatusCode::NO_CONTENT
+    );
+    let (status,value)=request(&router,"PUT",&format!("/api/v1/plants/{id}"),Some(json!({"name":"Archived fern","archived":true,"seed_id":seed_id,"germination_id":germination_id}))).await;
+    assert_eq!(status, StatusCode::OK, "{value}");
+    assert_eq!(
+        request(&router, "DELETE", &attempt_path, None).await.0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        request(&router, "DELETE", &format!("/api/v1/seeds/{seed_id}"), None)
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    let (_, value) = request(&router, "GET", &format!("/api/v1/plants/{id}"), None).await;
+    assert_eq!(value["seed_id"], seed_id);
+    assert_eq!(value["germination_id"], germination_id);
+    let (_, seeds) = request(&router, "GET", "/api/v1/seeds", None).await;
+    let packet = seeds
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["id"] == seed_id)
+        .unwrap();
+    assert_eq!(packet["breeder"], "Test breeder");
+    assert_eq!(packet["acquired_on"], "2026-09-27");
+    assert_eq!(
+        request(&router, "GET", "/api/v1/germination-attempts", None)
+            .await
+            .1[0]["seeds_germinated"],
+        3
+    );
+    let (status, imported) = request(
+        &router,
+        "POST",
+        "/api/v1/catalogs/import",
+        Some(json!({"catalogs":["herbs","vegetables"]})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{imported}");
+    assert_eq!(imported["added"], 36);
+    assert_eq!(
+        request(
+            &router,
+            "POST",
+            "/api/v1/catalogs/import",
+            Some(json!({"catalogs":["herbs","vegetables","cannabis"]}))
+        )
+        .await
+        .1["added"],
+        0
+    );
+    assert_eq!(
+        request(&router, "GET", "/api/v1/catalogs/imports", None)
+            .await
+            .1,
+        json!(["cannabis", "herbs", "vegetables"])
+    );
     // Re-opening applies migrations idempotently and retains the daily claim.
     let reopened = App::open(config).await.unwrap();
     assert!(

@@ -25,7 +25,7 @@ cargo run --locked
 
 `AZURE_SQL_PASSWORD` must be set as well. Do not put real credentials in example commands committed to this repository. `server` and `name` in TOML can replace the corresponding environment variables; environment variables take precedence. Credentials always come from the names configured by `username_env` and `password_env`.
 
-The `--migrate` command exits after schema setup, without starting the HTTP server or hardware workers. Migrations execute in a transaction under a database application lock and are versioned in `dbo.journal_schema`. Normal startup also migrates when `database.migrate = true`; with `false`, it verifies schema version 7 is installed. Use a dedicated database: table names are under `dbo` and could collide with unrelated application tables.
+The `--migrate` command exits after schema setup, without starting the HTTP server or hardware workers. Migrations execute in a transaction under a database application lock and are versioned in `dbo.journal_schema`. Normal startup also migrates when `database.migrate = true`; with `false`, it verifies schema version 9 is installed. Use a dedicated database: table names are under `dbo` and could collide with unrelated application tables.
 
 The default Rust startup (`cargo run` without `PLANT_CONFIG`) still uses SQLite, so existing journals and developer tests work without Azure credentials. The supplied Pi deployment configuration selects Azure SQL explicitly.
 
@@ -174,7 +174,7 @@ Before deploying the version with seed inventory, run the new binary with
 (as in the setup instructions above). This applies `0002_seed_inventory.sql`,
 adds the `seeds` table, and retains existing journal data. It is safe to rerun:
 applied versions are recorded in `dbo.journal_schema`. The cloud runtime keeps
-`database.migrate = false`. The current application requires version 7 at startup. Stop older application instances
+`database.migrate = false`. The current application requires version 9 at startup. Stop older application instances
 before the multi-user upgrade; they do not enforce garden isolation.
 
 SQLite applies this migration automatically on startup. SQLite imports include
@@ -202,7 +202,7 @@ image requests check garden membership.
 Back up first, stop older web and Pi instances, run the new binary with `--migrate`
 using the migration identity, then activate the owner with `--set-password
 ally.rippley@gmail.com` in an interactive terminal using the same database config.
-Start only the upgraded binaries. The runtime requires schema version 7 even when
+Start only the upgraded binaries. The runtime requires schema version 9 even when
 `database.migrate = false`. See [account operations](accounts.md).
 
 The legacy SQLite importer supports journals with just the original account and
@@ -243,3 +243,25 @@ starting an Azure runtime with automatic migration disabled. SQLite applies the
 migration on startup. Existing strains, photos, and inventory remain intact.
 Single-garden SQLite imports preserve plans and conversion links and accept older
 sources without a planner table.
+
+
+## Seed vault (schema version 8)
+
+Run `cargo run --locked -- --migrate` with the configured Azure SQL environment
+before restarting the upgraded app. This additive migration preserves seed stock,
+photos, and plant history. It adds breeder, acquisition date, and packet label
+fields, garden-scoped germination attempts, and optional packet/attempt origins
+on plants. Existing records have no origin until one is selected.
+
+SQLite upgrades automatically. Single-garden SQLite imports retain packet details,
+attempts, and plant links; older source journals receive empty metadata and origins.
+
+
+## Optional starter collections (schema version 9)
+
+Run `cargo run --locked -- --migrate` with the existing Azure environment before
+restarting the app. Migration 9 adds `garden_catalog_imports`, keyed by garden and
+collection, and recognizes earlier cannabis imports. It does not add new cards
+to existing gardens. New accounts and gardens explicitly choose their packs;
+existing gardens can import them from Collection or Settings. SQLite upgrades
+automatically and imports preserve this history when present.

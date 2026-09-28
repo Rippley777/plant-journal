@@ -131,6 +131,7 @@ async fn import_preserves_history_links_and_claims_but_disables_automation() {
     .unwrap();
     assert_eq!(counts["plants"], 1);
     assert_eq!(counts["strains"], 152);
+    assert_eq!(counts["garden_catalog_imports"], 0);
     assert_eq!(counts["cross_plans"], 1);
     let plan_notes: String = db::query_scalar("SELECT notes FROM cross_plans WHERE id='plan'")
         .fetch_one(&destination.pool)
@@ -441,4 +442,175 @@ async fn seed_migration_upgrades_existing_sqlite_journal() {
         .await
         .unwrap();
     assert_eq!(count, 0);
+}
+
+#[tokio::test]
+async fn seed_vault_import_preserves_packet_attempt_and_plant_origin() {
+    let (source_dir, source) = fixture().await;
+    let (_dest_dir, dest) = import_destination().await;
+    db::query("INSERT INTO seeds(id,name,quantity,unit,breeder,acquired_on,packet_code,created_at) VALUES('packet','Tomato',2,'packets','Local breeder','2026-09-27','Lot 2',1)").execute(&source.pool).await.unwrap();
+    db::query("INSERT INTO germination_attempts(id,garden_id,seed_id,started_on,seeds_sown,seeds_germinated,notes,created_at) VALUES('attempt',?,'packet','2026-09-27',4,3,'Three seedlings',2)").bind(plant_journal::auth::LEGACY_GARDEN).execute(&source.pool).await.unwrap();
+    db::query("INSERT INTO plants(id,name,seed_id,germination_id,archived,created_at) VALUES('seedling','Seedling','packet','attempt',1,3)").execute(&source.pool).await.unwrap();
+    db::query(
+        "INSERT INTO garden_catalog_imports(garden_id,catalog_id,imported_at) VALUES(?,'herbs',3)",
+    )
+    .bind(plant_journal::auth::LEGACY_GARDEN)
+    .execute(&source.pool)
+    .await
+    .unwrap();
+    let counts = import::sqlite_to_database(&source_dir.path().join("journal.sqlite3"), &dest.pool)
+        .await
+        .unwrap();
+    assert_eq!(counts["garden_catalog_imports"], 1);
+    assert_eq!(
+        db::query_scalar::<String>("SELECT catalog_id FROM garden_catalog_imports")
+            .fetch_one(&dest.pool)
+            .await
+            .unwrap(),
+        "herbs"
+    );
+    assert_eq!(counts["germination_attempts"], 1);
+    let packet: plant_journal::models::Seed = db::query_as("SELECT * FROM seeds")
+        .fetch_one(&dest.pool)
+        .await
+        .unwrap();
+    assert_eq!(packet.breeder, "Local breeder");
+    assert_eq!(packet.acquired_on.as_deref(), Some("2026-09-27"));
+    assert_eq!(packet.packet_code, "Lot 2");
+    let attempt: plant_journal::vault::Attempt = db::query_as("SELECT * FROM germination_attempts")
+        .fetch_one(&dest.pool)
+        .await
+        .unwrap();
+    assert_eq!(attempt.seeds_germinated, Some(3));
+    assert_eq!(attempt.notes, "Three seedlings");
+    let plant: Plant = db::query_as("SELECT * FROM plants")
+        .fetch_one(&dest.pool)
+        .await
+        .unwrap();
+    assert_eq!(plant.seed_id.as_deref(), Some("packet"));
+    assert_eq!(plant.germination_id.as_deref(), Some("attempt"));
+    assert!(plant.archived);
+}
+
+#[tokio::test]
+async fn seed_vault_upgrades_and_imports_a_pre_vault_database() {
+    use sqlx::{
+        migrate::Migrator,
+        sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+    };
+    let source = tempfile::tempdir().unwrap();
+    let migrations = tempfile::tempdir().unwrap();
+    for path in std::fs::read_dir("migrations/sqlite").unwrap() {
+        let path = path.unwrap().path();
+        if path.file_name().unwrap().to_str().unwrap() < "0008" {
+            std::fs::copy(&path, migrations.path().join(path.file_name().unwrap())).unwrap();
+        }
+    }
+    let file = source.path().join("journal.sqlite3");
+    let pool = SqlitePoolOptions::new()
+        .connect_with(
+            SqliteConnectOptions::new()
+                .filename(&file)
+                .create_if_missing(true),
+        )
+        .await
+        .unwrap();
+    Migrator::new(migrations.path())
+        .await
+        .unwrap()
+        .run(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO seeds(id,name,quantity,unit,created_at) VALUES('old','Old packet',7,'seeds',1)").execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO plants(id,name,created_at) VALUES('old-plant','Old plant',1)")
+        .execute(&pool)
+        .await
+        .unwrap();
+    pool.close().await;
+    let (_dir, dest) = import_destination().await;
+    let counts = import::sqlite_to_database(&file, &dest.pool).await.unwrap();
+    assert_eq!(counts["germination_attempts"], 0);
+    let seed: plant_journal::models::Seed = db::query_as("SELECT * FROM seeds")
+        .fetch_one(&dest.pool)
+        .await
+        .unwrap();
+    assert_eq!(seed.quantity, 7);
+    assert!(seed.breeder.is_empty());
+    assert!(seed.acquired_on.is_none());
+    let app = App::open(Config {
+        data_dir: source.path().into(),
+        ..Config::default()
+    })
+    .await
+    .unwrap();
+    let seed: plant_journal::models::Seed = db::query_as("SELECT * FROM seeds")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(seed.quantity, 7);
+    assert!(seed.packet_code.is_empty());
+    let plant: Plant = db::query_as("SELECT * FROM plants")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert!(plant.seed_id.is_none());
+    assert!(plant.germination_id.is_none());
+}
+
+#[tokio::test]
+async fn starter_collection_migration_recognizes_previous_cannabis_imports() {
+    use sqlx::{
+        migrate::Migrator,
+        sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let migrations = tempfile::tempdir().unwrap();
+    for path in std::fs::read_dir("migrations/sqlite").unwrap() {
+        let path = path.unwrap().path();
+        if path.file_name().unwrap().to_str().unwrap() < "0009" {
+            std::fs::copy(&path, migrations.path().join(path.file_name().unwrap())).unwrap();
+        }
+    }
+    let pool = SqlitePoolOptions::new()
+        .connect_with(
+            SqliteConnectOptions::new()
+                .filename(dir.path().join("journal.sqlite3"))
+                .create_if_missing(true),
+        )
+        .await
+        .unwrap();
+    Migrator::new(migrations.path())
+        .await
+        .unwrap()
+        .run(&pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO strain_catalog_imports(garden_id,imported_at,catalog_version) VALUES(?,123,2)",
+    )
+    .bind(plant_journal::auth::LEGACY_GARDEN)
+    .execute(&pool)
+    .await
+    .unwrap();
+    // A previously emptied collection must stay empty on upgrade.
+    pool.close().await;
+    let app = App::open(Config {
+        data_dir: dir.path().into(),
+        ..Config::default()
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        db::query_scalar::<i64>("SELECT COUNT(*) FROM strains")
+            .fetch_one(&app.pool)
+            .await
+            .unwrap(),
+        0
+    );
+    let row: db::Record = db::query_as("SELECT catalog_id,imported_at FROM garden_catalog_imports")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(row.get::<String>("catalog_id").unwrap(), "cannabis");
+    assert_eq!(row.get::<i64>("imported_at").unwrap(), 123);
 }

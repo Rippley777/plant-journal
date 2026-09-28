@@ -8,6 +8,10 @@ pub struct Plant {
     pub species: String,
     #[serde(default)]
     pub strain_id: Option<String>,
+    #[serde(default)]
+    pub seed_id: Option<String>,
+    #[serde(default)]
+    pub germination_id: Option<String>,
     pub notes: String,
     pub archived: bool,
     pub created_at: i64,
@@ -20,6 +24,8 @@ pub struct PlantInput {
     pub species: String,
     #[serde(default)]
     pub strain_id: Option<String>,
+    pub seed_id: Option<String>,
+    pub germination_id: Option<String>,
     #[serde(default)]
     pub notes: String,
     #[serde(default)]
@@ -144,6 +150,8 @@ record!(Plant {
     name,
     species,
     strain_id,
+    seed_id,
+    germination_id,
     notes,
     archived,
     created_at
@@ -201,6 +209,11 @@ pub struct Seed {
     pub quantity: i64,
     pub unit: String,
     pub supplier: String,
+    #[serde(default)]
+    pub breeder: String,
+    pub acquired_on: Option<String>,
+    #[serde(default)]
+    pub packet_code: String,
     pub purchase_year: Option<i64>,
     pub storage_location: String,
     pub notes: String,
@@ -218,6 +231,11 @@ pub struct SeedInput {
     pub unit: String,
     #[serde(default)]
     pub supplier: String,
+    #[serde(default)]
+    pub breeder: String,
+    pub acquired_on: Option<String>,
+    #[serde(default)]
+    pub packet_code: String,
     pub purchase_year: Option<i64>,
     #[serde(default)]
     pub storage_location: String,
@@ -232,6 +250,9 @@ record!(Seed {
     quantity,
     unit,
     supplier,
+    breeder,
+    acquired_on,
+    packet_code,
     purchase_year,
     storage_location,
     notes,

@@ -2,7 +2,7 @@
 let crossPlans = [], crossStatus = 'all';
 const crossById = id => crossPlans.find(plan => plan.id === id);
 function strainViews(planner) {
-  return `<nav class="collection-tabs" aria-label="Strain views"><a href="/strains" ${!planner?'class="active" aria-current="page"':''}>Strain cards</a><a href="/strains?view=crosses" ${planner?'class="active" aria-current="page"':''}>Cross planner</a></nav>`;
+  return `<nav class="collection-tabs" aria-label="Strain views"><a href="/strains" ${!planner?'class="active" aria-current="page"':''}>Collection cards</a><a href="/strains?view=crosses" ${planner?'class="active" aria-current="page"':''}>Cross planner</a></nav>`;
 }
 function crossParents(plan) {
   return [plan.parent_one_id,plan.parent_two_id].map(id=>strainById(id)?.name || 'Unknown parent').join(' × ');

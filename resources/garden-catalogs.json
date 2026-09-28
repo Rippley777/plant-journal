@@ -1,0 +1,581 @@
+[
+  {
+    "id": "vegetables",
+    "name": "Vegetables",
+    "description": "Tomatoes, peppers, leafy greens, cucumbers, and root vegetables.",
+    "entries": [
+      {
+        "name": "Cherokee Purple Tomato",
+        "species": "Tomato",
+        "aliases": [
+          "Cherokee Purple"
+        ],
+        "source_url": "https://ucanr.edu/sites/default/files/2026-04/2026%20Plant%20Sale%20List%20Veggies.pdf"
+      },
+      {
+        "name": "Brandywine Tomato",
+        "species": "Tomato",
+        "aliases": [
+          "Brandywine"
+        ],
+        "source_url": "https://ucanr.edu/sites/default/files/2026-04/2026%20Plant%20Sale%20List%20Veggies.pdf"
+      },
+      {
+        "name": "Sun Gold Tomato",
+        "species": "Tomato",
+        "aliases": [
+          "Sun Gold"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/tomatoes/cherry-tomatoes/sun-gold-f1-tomato-seed-770.11.html"
+      },
+      {
+        "name": "Nebula Pepper",
+        "species": "Pepper",
+        "aliases": [
+          "Nebula"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/peppers/"
+      },
+      {
+        "name": "Bottle Rocket Pepper",
+        "species": "Pepper",
+        "aliases": [
+          "Bottle Rocket"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/peppers/"
+      },
+      {
+        "name": "Nova Pepper",
+        "species": "Pepper",
+        "aliases": [
+          "Nova"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/peppers/"
+      },
+      {
+        "name": "Bolero Carrot",
+        "species": "Carrot",
+        "aliases": [
+          "Bolero"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/carrots/"
+      },
+      {
+        "name": "Mokum Carrot",
+        "species": "Carrot",
+        "aliases": [
+          "Mokum"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/carrots/"
+      },
+      {
+        "name": "Napoli Carrot",
+        "species": "Carrot",
+        "aliases": [
+          "Napoli"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/carrots/"
+      },
+      {
+        "name": "Marketmore 76 Cucumber",
+        "species": "Cucumber",
+        "aliases": [
+          "Marketmore 76"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/cucumbers/"
+      },
+      {
+        "name": "Diva Cucumber",
+        "species": "Cucumber",
+        "aliases": [
+          "Diva"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/cucumbers/"
+      },
+      {
+        "name": "H-19 Little Leaf Cucumber",
+        "species": "Cucumber",
+        "aliases": [
+          "H-19 Little Leaf"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/cucumbers/"
+      },
+      {
+        "name": "Little Gem Lettuce",
+        "species": "Lettuce",
+        "aliases": [
+          "Little Gem"
+        ],
+        "source_url": "https://www.westcoastseeds.com/products/little-gem"
+      },
+      {
+        "name": "Gordini Lettuce",
+        "species": "Lettuce",
+        "aliases": [
+          "Gordini"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/lettuce/"
+      },
+      {
+        "name": "Pint Size Lettuce",
+        "species": "Lettuce",
+        "aliases": [
+          "Pint Size"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/lettuce/"
+      },
+      {
+        "name": "Touchstone Gold Beet",
+        "species": "Beet",
+        "aliases": [
+          "Touchstone Gold"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/beets/"
+      },
+      {
+        "name": "Chioggia Guardsmark Beet",
+        "species": "Beet",
+        "aliases": [
+          "Chioggia Guardsmark"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/beets/"
+      },
+      {
+        "name": "French Breakfast Radish",
+        "species": "Radish",
+        "aliases": [
+          "French Breakfast"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/radishes/"
+      },
+      {
+        "name": "Sora Radish",
+        "species": "Radish",
+        "aliases": [
+          "Sora"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/radishes/"
+      },
+      {
+        "name": "Red Meat Radish",
+        "species": "Radish",
+        "aliases": [
+          "Red Meat"
+        ],
+        "source_url": "https://www.johnnyseeds.com/vegetables/radishes/"
+      }
+    ]
+  },
+  {
+    "id": "herbs",
+    "name": "Herbs",
+    "description": "Basil, dill, parsley, cilantro, thyme, oregano, and chives.",
+    "entries": [
+      {
+        "name": "Genovese Basil",
+        "species": "Basil",
+        "aliases": [
+          "Genovese"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/basil/"
+      },
+      {
+        "name": "Cinnamon Basil",
+        "species": "Basil",
+        "aliases": [
+          "Cinnamon"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/basil/"
+      },
+      {
+        "name": "Mrs. Burns' Lemon Basil",
+        "species": "Basil",
+        "aliases": [
+          "Mrs. Burns' Lemon"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/basil/"
+      },
+      {
+        "name": "Aromatto Basil",
+        "species": "Basil",
+        "aliases": [
+          "Aromatto"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/basil/"
+      },
+      {
+        "name": "Bouquet Dill",
+        "species": "Dill",
+        "aliases": [
+          "Bouquet"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/dill/"
+      },
+      {
+        "name": "Fernleaf Dill",
+        "species": "Dill",
+        "aliases": [
+          "Fernleaf"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/dill/"
+      },
+      {
+        "name": "Hera Dill",
+        "species": "Dill",
+        "aliases": [
+          "Hera"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/dill/"
+      },
+      {
+        "name": "Giant of Italy Parsley",
+        "species": "Parsley",
+        "aliases": [
+          "Giant of Italy"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/parsley/"
+      },
+      {
+        "name": "Darki Green Parsley",
+        "species": "Parsley",
+        "aliases": [
+          "Darki Green"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/parsley/"
+      },
+      {
+        "name": "Santo Cilantro",
+        "species": "Cilantro",
+        "aliases": [
+          "Santo"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/cilantro-coriander/"
+      },
+      {
+        "name": "Calypso Cilantro",
+        "species": "Cilantro",
+        "aliases": [
+          "Calypso"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/cilantro-coriander/"
+      },
+      {
+        "name": "Leisure Cilantro",
+        "species": "Cilantro",
+        "aliases": [
+          "Leisure"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/cilantro-coriander/"
+      },
+      {
+        "name": "German Winter Thyme",
+        "species": "Thyme",
+        "aliases": [
+          "German Winter"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/thyme/"
+      },
+      {
+        "name": "Summer Thyme",
+        "species": "Thyme",
+        "aliases": [
+          "Summer"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/thyme/"
+      },
+      {
+        "name": "Greek Oregano",
+        "species": "Oregano",
+        "aliases": [
+          "Greek"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/oregano/"
+      },
+      {
+        "name": "Staro Chives",
+        "species": "Chives",
+        "aliases": [
+          "Staro"
+        ],
+        "source_url": "https://www.johnnyseeds.com/herbs/chives/"
+      }
+    ]
+  },
+  {
+    "id": "flowers",
+    "name": "Flowers",
+    "description": "Zinnias, cosmos, and sunflowers for a colorful collection.",
+    "entries": [
+      {
+        "name": "Benary's Giant White Zinnia",
+        "species": "Zinnia",
+        "aliases": [
+          "Benary's Giant White"
+        ],
+        "source_url": "https://www.johnnyseeds.com/flowers/zinnias/"
+      },
+      {
+        "name": "Benary's Giant Salmon Rose Zinnia",
+        "species": "Zinnia",
+        "aliases": [
+          "Benary's Giant Salmon Rose"
+        ],
+        "source_url": "https://www.johnnyseeds.com/flowers/zinnias/"
+      },
+      {
+        "name": "Benary's Giant Purple Zinnia",
+        "species": "Zinnia",
+        "aliases": [
+          "Benary's Giant Purple"
+        ],
+        "source_url": "https://www.johnnyseeds.com/flowers/zinnias/"
+      },
+      {
+        "name": "Queeny Red Lime Zinnia",
+        "species": "Zinnia",
+        "aliases": [
+          "Queeny Red Lime"
+        ],
+        "source_url": "https://www.johnnyseeds.com/flowers/zinnias/"
+      },
+      {
+        "name": "Cupcakes Blush Cosmos",
+        "species": "Cosmos",
+        "aliases": [
+          "Cupcakes Blush"
+        ],
+        "source_url": "https://www.johnnyseeds.com/flowers/cosmos/"
+      },
+      {
+        "name": "Cupcakes White Cosmos",
+        "species": "Cosmos",
+        "aliases": [
+          "Cupcakes White"
+        ],
+        "source_url": "https://www.johnnyseeds.com/flowers/cosmos/"
+      },
+      {
+        "name": "Double Click Snow Puff Cosmos",
+        "species": "Cosmos",
+        "aliases": [
+          "Double Click Snow Puff"
+        ],
+        "source_url": "https://www.johnnyseeds.com/flowers/cosmos/"
+      },
+      {
+        "name": "Apricotta Cosmos",
+        "species": "Cosmos",
+        "aliases": [
+          "Apricotta"
+        ],
+        "source_url": "https://www.johnnyseeds.com/flowers/cosmos/"
+      },
+      {
+        "name": "ProCut White Nite Sunflower",
+        "species": "Sunflower",
+        "aliases": [
+          "ProCut White Nite"
+        ],
+        "source_url": "https://www.johnnyseeds.com/flowers/sunflowers/"
+      },
+      {
+        "name": "ProCut White Lite Sunflower",
+        "species": "Sunflower",
+        "aliases": [
+          "ProCut White Lite"
+        ],
+        "source_url": "https://www.johnnyseeds.com/flowers/sunflowers/"
+      },
+      {
+        "name": "ProCut Red Sunflower",
+        "species": "Sunflower",
+        "aliases": [
+          "ProCut Red"
+        ],
+        "source_url": "https://www.johnnyseeds.com/flowers/sunflowers/"
+      },
+      {
+        "name": "Orange Hobbit Sunflower",
+        "species": "Sunflower",
+        "aliases": [
+          "Orange Hobbit"
+        ],
+        "source_url": "https://www.johnnyseeds.com/flowers/sunflowers/"
+      }
+    ]
+  },
+  {
+    "id": "fruit",
+    "name": "Fruit & berries",
+    "description": "Strawberry, blueberry, and raspberry varieties for your garden wishlist.",
+    "entries": [
+      {
+        "name": "Earliglow Strawberry",
+        "species": "Strawberry",
+        "aliases": [
+          "Earliglow"
+        ],
+        "source_url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-strawberries-in-the-home-garden"
+      },
+      {
+        "name": "Jewel Strawberry",
+        "species": "Strawberry",
+        "aliases": [
+          "Jewel"
+        ],
+        "source_url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-strawberries-in-the-home-garden"
+      },
+      {
+        "name": "Seascape Strawberry",
+        "species": "Strawberry",
+        "aliases": [
+          "Seascape"
+        ],
+        "source_url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-strawberries-in-the-home-garden"
+      },
+      {
+        "name": "Albion Strawberry",
+        "species": "Strawberry",
+        "aliases": [
+          "Albion"
+        ],
+        "source_url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-strawberries-in-the-home-garden"
+      },
+      {
+        "name": "Bluecrop Blueberry",
+        "species": "Blueberry",
+        "aliases": [
+          "Bluecrop"
+        ],
+        "source_url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-blueberries-in-the-home-garden"
+      },
+      {
+        "name": "Northblue Blueberry",
+        "species": "Blueberry",
+        "aliases": [
+          "Northblue"
+        ],
+        "source_url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-blueberries-in-the-home-garden"
+      },
+      {
+        "name": "Northcountry Blueberry",
+        "species": "Blueberry",
+        "aliases": [
+          "Northcountry"
+        ],
+        "source_url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-blueberries-in-the-home-garden"
+      },
+      {
+        "name": "Patriot Blueberry",
+        "species": "Blueberry",
+        "aliases": [
+          "Patriot"
+        ],
+        "source_url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-blueberries-in-the-home-garden"
+      },
+      {
+        "name": "Boyne Raspberry",
+        "species": "Raspberry",
+        "aliases": [
+          "Boyne"
+        ],
+        "source_url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-raspberries-in-the-home-garden"
+      },
+      {
+        "name": "Heritage Raspberry",
+        "species": "Raspberry",
+        "aliases": [
+          "Heritage"
+        ],
+        "source_url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-raspberries-in-the-home-garden"
+      },
+      {
+        "name": "Caroline Raspberry",
+        "species": "Raspberry",
+        "aliases": [
+          "Caroline"
+        ],
+        "source_url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-raspberries-in-the-home-garden"
+      },
+      {
+        "name": "Anne Raspberry",
+        "species": "Raspberry",
+        "aliases": [
+          "Anne"
+        ],
+        "source_url": "https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-raspberries-in-the-home-garden"
+      }
+    ]
+  },
+  {
+    "id": "houseplants",
+    "name": "Houseplants",
+    "description": "Pothos, philodendrons, and snake plants for an indoor collection.",
+    "entries": [
+      {
+        "name": "Golden Pothos",
+        "species": "Pothos",
+        "aliases": [
+          "Golden"
+        ],
+        "source_url": "https://www.rhs.org.uk/plants/epipremnum"
+      },
+      {
+        "name": "Marble Queen Pothos",
+        "species": "Pothos",
+        "aliases": [
+          "Marble Queen"
+        ],
+        "source_url": "https://www.rhs.org.uk/plants/epipremnum"
+      },
+      {
+        "name": "N'joy Pothos",
+        "species": "Pothos",
+        "aliases": [
+          "N'joy"
+        ],
+        "source_url": "https://www.rhs.org.uk/plants/epipremnum"
+      },
+      {
+        "name": "Burgundy Philodendron",
+        "species": "Philodendron",
+        "aliases": [
+          "Burgundy"
+        ],
+        "source_url": "https://www.rhs.org.uk/plants/philodendron"
+      },
+      {
+        "name": "Imperial Red Philodendron",
+        "species": "Philodendron",
+        "aliases": [
+          "Imperial Red"
+        ],
+        "source_url": "https://www.rhs.org.uk/plants/philodendron"
+      },
+      {
+        "name": "Hahnii Snake Plant",
+        "species": "Snake Plant",
+        "aliases": [
+          "Hahnii"
+        ],
+        "source_url": "https://www.rhs.org.uk/plants/sansevieria"
+      },
+      {
+        "name": "Laurentii Snake Plant",
+        "species": "Snake Plant",
+        "aliases": [
+          "Laurentii"
+        ],
+        "source_url": "https://www.rhs.org.uk/plants/sansevieria"
+      },
+      {
+        "name": "Moonshine Snake Plant",
+        "species": "Snake Plant",
+        "aliases": [
+          "Moonshine"
+        ],
+        "source_url": "https://www.rhs.org.uk/plants/sansevieria"
+      }
+    ]
+  }
+]

@@ -6,13 +6,15 @@ use std::{collections::BTreeMap, path::Path};
 
 const TABLES: &[(&str, &str)] = &[
     ("strains", "id,garden_id,name,name_key,species,breeder,notes,status,lineage_note,source_url,created_at"),
+    ("garden_catalog_imports", "garden_id,catalog_id,imported_at"),
     ("strain_catalog_imports", "garden_id,imported_at,catalog_version"),
     ("cross_plans", "id,garden_id,name,name_key,species,breeder,notes,parent_one_id,parent_two_id,converted_strain_id,converted_at,created_at,updated_at"),
     (
         "seeds",
-        "id,name,variety,quantity,unit,supplier,purchase_year,storage_location,notes,created_at,strain_id",
+        "id,name,variety,quantity,unit,supplier,purchase_year,storage_location,notes,created_at,strain_id,breeder,acquired_on,packet_code",
     ),
-    ("plants", "id,name,species,notes,archived,created_at,strain_id"),
+    ("germination_attempts", "id,garden_id,seed_id,started_on,seeds_sown,seeds_germinated,notes,created_at"),
+    ("plants", "id,name,species,notes,archived,created_at,strain_id,seed_id,germination_id"),
     ("entries", "id,kind,body,occurred_at,created_at"),
     ("photos", "id,filename,captured_at,source"),
     ("readings", "recorded_at,temperature_c,humidity_percent"),
@@ -86,7 +88,13 @@ pub async fn sqlite_to_database(
         // Older read-only source journals predate seed inventory or seed photos.
         if matches!(
             *table,
-            "seeds" | "photo_seeds" | "strains" | "strain_catalog_imports" | "cross_plans"
+            "seeds"
+                | "photo_seeds"
+                | "strains"
+                | "strain_catalog_imports"
+                | "garden_catalog_imports"
+                | "cross_plans"
+                | "germination_attempts"
         ) {
             let exists: i64 = sqlx::query_scalar(
                 "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
@@ -101,15 +109,43 @@ pub async fn sqlite_to_database(
         }
         let mut selected_columns = columns.to_string();
         if matches!(*table, "plants" | "seeds") {
-            let has_strain: i64 = sqlx::query_scalar(&format!(
-                "SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name='strain_id'"
-            ))
-            .fetch_one(&mut *snapshot)
-            .await?;
-            if has_strain == 0 {
-                selected_columns = selected_columns.replace("strain_id", "NULL AS strain_id");
+            let defaults = if *table == "plants" {
+                vec![
+                    ("strain_id", "NULL"),
+                    ("seed_id", "NULL"),
+                    ("germination_id", "NULL"),
+                ]
+            } else {
+                vec![
+                    ("strain_id", "NULL"),
+                    ("breeder", "''"),
+                    ("acquired_on", "NULL"),
+                    ("packet_code", "''"),
+                ]
+            };
+            for (column, default) in defaults {
+                let present: i64 = sqlx::query_scalar(&format!(
+                    "SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name=?"
+                ))
+                .bind(column)
+                .fetch_one(&mut *snapshot)
+                .await?;
+                if present == 0 {
+                    selected_columns = selected_columns
+                        .split(',')
+                        .map(|c| {
+                            if c == column {
+                                format!("{default} AS {column}")
+                            } else {
+                                c.to_string()
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                        .join(",");
+                }
             }
         }
+
         if *table == "strain_catalog_imports" {
             let has_version: i64 = sqlx::query_scalar(
                 "SELECT COUNT(*) FROM pragma_table_info('strain_catalog_imports') WHERE name='catalog_version'",

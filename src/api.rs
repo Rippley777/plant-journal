@@ -64,8 +64,8 @@ fn render(page: &str) -> Response {
     let title = match page {
         "dashboard" => "Overview",
         "plants" => "Your plants",
-        "seeds" => "Seed inventory",
-        "strains" => "Strain collection",
+        "seeds" => "Seed vault",
+        "strains" => "Varieties & strains",
         "journal" => "Journal",
         "calendar" => "Calendar",
         "photos" => "Photo journal",
@@ -123,6 +123,10 @@ pub fn router(app: Arc<App>) -> Router {
                 )
             }),
         )
+        .route("/api/v1/catalogs", get(crate::catalogs::list))
+        .route("/api/v1/catalogs/imports", get(crate::catalogs::imports))
+        .route("/api/v1/catalogs/import", post(crate::catalogs::import))
+        .route("/assets/catalogs.js", get(|| async { ([(header::CONTENT_TYPE,"text/javascript; charset=utf-8")],include_str!("../static/catalogs.js")) }))
         .route("/api/v1/strains", get(crate::strains::list).post(crate::strains::create))
         .route("/api/v1/strains/{id}", axum::routing::put(crate::strains::update).delete(crate::strains::delete))
         .route("/api/v1/cross-plans", get(crate::crosses::list).post(crate::crosses::create))
@@ -131,6 +135,10 @@ pub fn router(app: Arc<App>) -> Router {
         .route("/assets/strains.js", get(|| async { ([(header::CONTENT_TYPE,"text/javascript; charset=utf-8")],include_str!("../static/strains.js")) }))
         .route("/assets/crosses.js", get(|| async { ([(header::CONTENT_TYPE,"text/javascript; charset=utf-8")],include_str!("../static/crosses.js")) }))
         .route("/api/v1/summary", get(summary))
+        .route("/assets/vault.js", get(|| async { ([(header::CONTENT_TYPE,"text/javascript; charset=utf-8")],include_str!("../static/vault.js")) }))
+        .route("/api/v1/germination-attempts", get(crate::vault::list))
+        .route("/api/v1/seeds/{seed}/attempts", post(crate::vault::create))
+        .route("/api/v1/seeds/{seed}/attempts/{id}", axum::routing::put(crate::vault::update).delete(crate::vault::delete))
         .route("/api/v1/seeds", get(seeds).post(create_seed))
         .route("/api/v1/seeds/{id}", axum::routing::put(update_seed).delete(delete_seed))
         .route("/api/v1/plants", get(plants).post(create_plant))
@@ -338,14 +346,21 @@ async fn create_plant(
     let mut tx = app.pool.begin().await?;
     crate::strains::lock_garden(&mut tx, &garden).await?;
     crate::strains::link(&mut tx, &garden, input.strain_id.as_deref(), true).await?;
-    db::query("INSERT INTO plants(id,name,species,notes,archived,created_at,garden_id,strain_id) VALUES(?,?,?,?,?,?,?,?)")
+    crate::vault::validate_origin(
+        &mut tx,
+        &garden,
+        input.seed_id.as_deref(),
+        input.germination_id.as_deref(),
+    )
+    .await?;
+    db::query("INSERT INTO plants(id,name,species,notes,archived,created_at,garden_id,strain_id,seed_id,germination_id) VALUES(?,?,?,?,?,?,?,?,?,?)")
         .bind(&id)
         .bind(input.name.trim())
         .bind(&input.species)
         .bind(&input.notes)
         .bind(input.archived)
         .bind(now)
-        .bind(&*garden).bind(&input.strain_id).execute(&mut tx)
+        .bind(&*garden).bind(&input.strain_id).bind(&input.seed_id).bind(&input.germination_id).execute(&mut tx)
         .await?;
     store::garden_event(
         &mut tx,
@@ -377,12 +392,21 @@ async fn update_plant(
     let mut tx = app.pool.begin().await?;
     crate::strains::lock_garden(&mut tx, &garden).await?;
     crate::strains::link(&mut tx, &garden, input.strain_id.as_deref(), true).await?;
-    db::query("UPDATE plants SET name=?,species=?,notes=?,archived=?,strain_id=? WHERE id=? AND garden_id=?")
+    crate::vault::validate_origin(
+        &mut tx,
+        &garden,
+        input.seed_id.as_deref(),
+        input.germination_id.as_deref(),
+    )
+    .await?;
+    db::query("UPDATE plants SET name=?,species=?,notes=?,archived=?,strain_id=?,seed_id=?,germination_id=? WHERE id=? AND garden_id=?")
         .bind(input.name.trim())
         .bind(&input.species)
         .bind(&input.notes)
         .bind(input.archived)
         .bind(&input.strain_id)
+        .bind(&input.seed_id)
+        .bind(&input.germination_id)
         .bind(&id)
         .bind(&*garden)
         .execute(&mut tx)
@@ -1213,6 +1237,12 @@ async fn seeds(
 }
 fn check_seed(input: &SeedInput) -> Result<()> {
     text(&input.name, "Name", 120)?;
+    if let Some(date) = &input.acquired_on {
+        crate::vault::check_date(date)?;
+    }
+    if input.breeder.len() > 160 || input.packet_code.len() > 160 {
+        return Err(ApiError::bad("Breeder or packet label is too long"));
+    }
     if input.variety.len() > 160
         || input.supplier.len() > 160
         || input.storage_location.len() > 160
@@ -1254,10 +1284,10 @@ async fn create_seed(
         input.quantity > 0,
     )
     .await?;
-    db::query("INSERT INTO seeds(id,name,variety,quantity,unit,supplier,purchase_year,storage_location,notes,created_at,garden_id,strain_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
+    db::query("INSERT INTO seeds(id,name,variety,quantity,unit,supplier,purchase_year,storage_location,notes,created_at,garden_id,strain_id,breeder,acquired_on,packet_code) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
         .bind(&id).bind(input.name.trim()).bind(&input.variety).bind(input.quantity).bind(&input.unit)
         .bind(&input.supplier).bind(input.purchase_year).bind(&input.storage_location).bind(&input.notes)
-        .bind(Utc::now().timestamp()).bind(&*garden).bind(&input.strain_id).execute(&mut tx).await?;
+        .bind(Utc::now().timestamp()).bind(&*garden).bind(&input.strain_id).bind(&input.breeder).bind(&input.acquired_on).bind(&input.packet_code).execute(&mut tx).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(json!({"id":id}))))
 }
@@ -1277,10 +1307,10 @@ async fn update_seed(
         input.quantity > 0,
     )
     .await?;
-    let result = db::query("UPDATE seeds SET name=?,variety=?,quantity=?,unit=?,supplier=?,purchase_year=?,storage_location=?,notes=?,strain_id=? WHERE id=? AND garden_id=?")
+    let result = db::query("UPDATE seeds SET name=?,variety=?,quantity=?,unit=?,supplier=?,purchase_year=?,storage_location=?,notes=?,strain_id=?,breeder=?,acquired_on=?,packet_code=? WHERE id=? AND garden_id=?")
         .bind(input.name.trim()).bind(&input.variety).bind(input.quantity).bind(&input.unit)
         .bind(&input.supplier).bind(input.purchase_year).bind(&input.storage_location).bind(&input.notes)
-        .bind(&input.strain_id).bind(&id).bind(&*garden).execute(&mut tx).await?;
+        .bind(&input.strain_id).bind(&input.breeder).bind(&input.acquired_on).bind(&input.packet_code).bind(&id).bind(&*garden).execute(&mut tx).await?;
     if result.rows_affected() == 0 {
         return Err(ApiError::missing());
     }
@@ -1292,13 +1322,21 @@ async fn delete_seed(
     Extension(Garden(garden)): Extension<Garden>,
     Path(id): Path<String>,
 ) -> Result<StatusCode> {
+    let mut tx = app.pool.begin().await?;
+    crate::strains::lock_garden(&mut tx, &garden).await?;
+    let links: i64 = db::query_scalar("SELECT (SELECT COUNT(*) FROM plants WHERE seed_id=? AND garden_id=?) + (SELECT COUNT(*) FROM germination_attempts WHERE seed_id=? AND garden_id=?)")
+        .bind(&id).bind(&*garden).bind(&id).bind(&*garden).fetch_one(&mut tx).await?;
+    if links > 0 {
+        return Err(ApiError::bad("This packet has germination history or linked plants. Keep it with zero stock, or remove those links and attempts before deleting it."));
+    }
     let result = db::query("DELETE FROM seeds WHERE id=? AND garden_id=?")
         .bind(&id)
         .bind(&*garden)
-        .execute(&app.pool)
+        .execute(&mut tx)
         .await?;
     if result.rows_affected() == 0 {
         return Err(ApiError::missing());
     }
+    tx.commit().await?;
     Ok(StatusCode::NO_CONTENT)
 }

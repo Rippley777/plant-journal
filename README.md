@@ -33,7 +33,7 @@ Application pages and APIs require a session. Use HTTPS with `secure_cookies = t
 - Garden isolation for journal records, photos, equipment, schedules, and settings.
 
 - Plant profiles, notes, species/variety, and archival that preserves history.
-- Seed inventory with varieties, quantities in seeds or packets, supplier, purchase year, storage location, and notes. Add, edit, and delete stock from **Seeds**; zero quantity keeps an out-of-stock record.
+- **Seed vault** with packet / lot labels, breeders, acquisition dates, suppliers, storage locations, photos, and quantities in seeds or packets. Open a packet to record germination attempts and see every plant grown from it, including archived plants. A blank germination result is pending; zero records a failed attempt. Germination rates use completed attempts only. Stock quantities remain manually controlled.
 - Dated notes, watering, feeding, pruning, and repotting entries linked to one or several plants; edit and delete support.
 - Month calendar with selected-day details and plant/event filters. Shared environment and equipment events appear under **All plants**; a plant filter shows explicitly linked events.
 - **Add photo** on any plant or seed record uploads a JPEG, PNG, GIF, or WebP file up to 10 MB without a camera. Plant uploads appear in their photo history; seed uploads appear on their inventory card. All uploads also appear in the photo journal and calendar. Deleting a seed retains its photos in the photo journal.
@@ -42,14 +42,27 @@ Application pages and APIs require a session. Use HTTPS with `secure_cookies = t
 - Local Shelly RPC and simulated outlets, daily on/off windows, overnight schedules, timed overrides, and **Resume schedule**.
 - UTC storage, configurable IANA timezone, persistent execution records, component health, and structured service logs.
 
-Open **Strains** for your collectible strain cards and interactive ancestry graphs.
+Open **Collection** for variety and strain cards and interactive ancestry graphs.
+At signup or when creating a garden, optionally choose **Vegetables (20)**,
+**Herbs (16)**, **Flowers (12)**, **Fruit & berries (12)**, **Houseplants (8)**,
+and **Cannabis (152)**. Mix collections or start empty. Use **Add starter collections**
+in Collection or Settings to add more later. Imports preserve existing cards and
+edits, and deleted cards are not recreated. Filter mixed collections by plant type.
+
+In **Seed vault**, add one record per packet or lot you want to track separately.
+Open its card to record attempts (date, seeds sown, final germinated count, notes).
+**Add plant from attempt** carries the packet, attempt, and linked strain into the
+new plant form. Existing plants can be linked through **Edit plant → Seed origin**.
+Plant pages link back to their source packet. Packets and attempts with linked
+history cannot be deleted; set stock to zero when a packet is used up.
+
 Link plants and seeds to existing strains, or type a new strain name in their forms.
 Cards can be unowned, wanted, or collected; linked plants and seeds on hand unlock
 cards automatically. The original owner's garden starts with 152 curated cannabis
 strains and selected documented parentage. See [strain collection and lineage](docs/strains.md)
 for collection rules, sources, and database upgrade details.
 
-Use **Strains → Cross planner** to save ideas with two parent strains and notes.
+Use **Collection → Cross planner** to save ideas with two parent strains and notes.
 When you have the cross, choose **Create strain** to turn the plan into a collected
 card with its recorded ancestry. The original plan stays linked to that card.
 
@@ -195,10 +208,16 @@ All endpoints are under `/api/v1`. Mutations use JSON; timestamps are Unix secon
 
 | Endpoint | Behavior |
 | --- | --- |
+| `GET /catalogs` | Public starter collection names, IDs, counts, and examples |
+| `GET /catalogs/imports` | Collection IDs already added to the selected garden |
+| `POST /catalogs/import` | Add `{catalogs:["vegetables","herbs"]}` once per garden; preserve existing cards and edits |
 | `GET /summary` | Counts, last reading/staleness, health, configured adapter modes, settings |
-| `GET, POST /seeds` | List inventory / create `{name,variety?,quantity,unit,supplier?,purchase_year?,storage_location?,notes?}`; unit is `seeds` or `packets` |
-| `PUT, DELETE /seeds/{id}` | Replace inventory record / permanently delete it |
-| `GET, POST /plants` | List all plants / create `{name,species?,notes?,archived?}` |
+| `GET, POST /seeds` | List inventory / create `{name,variety?,strain_id?,quantity,unit,supplier?,breeder?,acquired_on?,packet_code?,purchase_year?,storage_location?,notes?}`; unit is `seeds` or `packets` |
+| `PUT, DELETE /seeds/{id}` | Replace packet / delete only if no attempts or plants reference it |
+| `GET /germination-attempts` | List attempts in the active garden, newest start date first |
+| `POST /seeds/{id}/attempts` | Record `{started_on,seeds_sown,seeds_germinated?,notes?}`; dates are `YYYY-MM-DD`, null result means pending |
+| `PUT, DELETE /seeds/{id}/attempts/{attempt}` | Replace an attempt / delete only after unlinking its plants |
+| `GET, POST /plants` | List all plants / create `{name,species?,strain_id?,seed_id?,germination_id?,notes?,archived?}`; an attempt must belong to the chosen packet |
 | `GET, PUT /plants/{id}` | Read / replace profile; archive through `archived` |
 | `GET, POST /entries` | Optional `?plant=id`; create `{kind,body,occurred_at,plant_ids}` |
 | `PUT, DELETE /entries/{id}` | Replace / delete entry and its calendar event |

@@ -37,8 +37,51 @@ try {
   await visitor.goto(base+'/signup');
   await visitor.getByLabel('Email',{exact:true}).fill('browser@example.com');
   await visitor.getByLabel('Password',{exact:true}).fill('Browser testing passphrase');
+  await visitor.getByRole('checkbox',{name:'Vegetables',exact:true}).waitFor();
+  assert.equal(await visitor.locator('input[name="catalogs"]:checked').count(),0);
+  await visitor.getByRole('checkbox',{name:'Vegetables',exact:true}).check();
+  await visitor.getByRole('checkbox',{name:'Herbs',exact:true}).check();
+  assert.equal(await visitor.getByRole('checkbox',{name:'Cannabis',exact:true}).isChecked(),false);
+  await visitor.setViewportSize({width:390,height:844});
+  assert.ok(await visitor.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Signup choices overflow mobile');
+  await visitor.screenshot({path:join(artifacts,'starter-collections-signup-mobile.png'),fullPage:true});
   await visitor.getByRole('button',{name:'Create account',exact:true}).click();
   await visitor.locator('#content[aria-busy="false"]').waitFor();
+  await visitor.goto(base+'/strains');await visitor.locator('#content[aria-busy="false"]').waitFor();
+  assert.equal(await visitor.locator('.strain-card').count(),36);
+  assert.equal(await visitor.locator('.strain-card.is-collected').count(),0);
+  assert.equal(await visitor.getByLabel('Plant type',{exact:true}).locator('option[value="Cannabis"]').count(),0);
+  await visitor.getByLabel('Plant type',{exact:true}).selectOption('Basil');
+  assert.equal(await visitor.locator('.strain-card').count(),4);
+  await visitor.getByLabel('Find a variety or strain',{exact:true}).fill('Genovese');
+  assert.equal(await visitor.locator('.strain-card').count(),1);
+  await visitor.getByRole('link',{name:'Genovese Basil · Not collected',exact:true}).click();
+  await visitor.getByRole('button',{name:'✦ Mark collected',exact:true}).click();
+  await visitor.getByRole('link',{name:'Genovese Basil · Collected',exact:true}).waitFor();
+  await visitor.goto(base+'/strains');await visitor.locator('#content[aria-busy="false"]').waitFor();
+  await visitor.getByRole('button',{name:'Add starter collections',exact:true}).click();
+  const starterDialog=visitor.locator('dialog');
+  assert.equal(await starterDialog.getByRole('checkbox',{name:'Vegetables',exact:true}).isDisabled(),true);
+  assert.equal(await starterDialog.getByRole('checkbox',{name:'Herbs',exact:true}).isDisabled(),true);
+  await starterDialog.getByRole('checkbox',{name:'Flowers',exact:true}).check();
+  await starterDialog.getByRole('checkbox',{name:'Fruit & berries',exact:true}).check();
+  assert.ok(await starterDialog.evaluate(el=>el.scrollWidth<=el.clientWidth),'Starter collection dialog overflows mobile');
+  await starterDialog.getByRole('button',{name:'Add collections',exact:true}).click();
+  await starterDialog.waitFor({state:'hidden'});
+  await visitor.getByText('24 cards added to your collection.',{exact:true}).waitFor();
+  await visitor.reload();await visitor.locator('#content[aria-busy="false"]').waitFor();
+  assert.equal(await visitor.locator('.strain-card').count(),60);
+  assert.equal(await visitor.locator('.strain-card.is-collected').count(),1);
+  assert.ok(await visitor.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mixed collection overflows mobile');
+  await visitor.setViewportSize({width:1440,height:1050});
+  await visitor.screenshot({path:join(artifacts,'garden-collection-desktop.png')});
+  await visitor.getByRole('button',{name:'New garden',exact:true}).click();
+  await starterDialog.getByLabel('Garden name',{exact:true}).fill('Indoor plants');
+  await starterDialog.getByRole('checkbox',{name:'Houseplants',exact:true}).check();
+  await starterDialog.getByRole('button',{name:'Create garden',exact:true}).click();
+  await visitor.waitForURL(base+'/');await visitor.locator('#content[aria-busy="false"]').waitFor();
+  await visitor.goto(base+'/strains');await visitor.locator('#content[aria-busy="false"]').waitFor();
+  assert.equal(await visitor.locator('.strain-card').count(),8);
   await visitor.getByRole('button',{name:'Sign out',exact:true}).click();
   await visitor.waitForURL(base+'/login');
   await visitor.getByLabel('Email',{exact:true}).fill('browser@example.com');
@@ -133,7 +176,7 @@ with sqlite3.connect(sys.argv[1]) as db:
   await go('/strains');
   assert.equal(await page.locator('.strain-card').count(),152);
   assert.equal(await page.locator('.strain-card.is-collected').count(),0);
-  await page.getByLabel('Find a strain',{exact:true}).fill('Blue Dream');
+  await page.getByLabel('Find a variety or strain',{exact:true}).fill('Blue Dream');
   await page.getByRole('link',{name:'Blue Dream · Not collected',exact:true}).click();
   await page.getByRole('heading',{name:'Ancestry',exact:true}).waitFor();
   assert.equal(await page.locator('.lineage-node').count(),3);
@@ -152,7 +195,7 @@ with sqlite3.connect(sys.argv[1]) as db:
   await dialog().getByLabel('Parent 1',{exact:true}).selectOption({label:'Blue Dream'});
   await dialog().getByLabel('Parent 2',{exact:true}).selectOption({label:'Gelato'});
   await dialog().getByRole('button',{name:'Save strain',exact:true}).click();await closed();
-  await page.getByLabel('Find a strain',{exact:true}).fill('Browser cross');
+  await page.getByLabel('Find a variety or strain',{exact:true}).fill('Browser cross');
   await page.getByRole('link',{name:'Browser cross · Wanted',exact:true}).click();
   await page.getByRole('heading',{name:'Ancestry',exact:true}).waitFor();
   await page.getByLabel('Generations',{exact:true}).selectOption('3');
@@ -315,6 +358,51 @@ with sqlite3.connect(sys.argv[1]) as db:
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,`Mobile overflow on ${path}`);
   }
   await go('/calendar');await page.screenshot({path:join(artifacts,'calendar-mobile.png'),fullPage:true});
+  // Seed vault: packet metadata, pending results, and plant provenance.
+  await go('/seeds');
+  await page.getByRole('button',{name:'+ Add your first seeds',exact:true}).click();
+  await dialog().getByLabel('Name',{exact:true}).fill('Vault tomato');
+  await dialog().getByLabel('Breeder',{exact:true}).fill('Community breeder');
+  await dialog().getByLabel('Acquired on',{exact:true}).fill('2026-09-27');
+  await dialog().getByLabel('Packet / lot label',{exact:true}).fill('Lot 01');
+  await dialog().getByLabel('Strain',{exact:true}).fill('Browser cross');
+  assert.ok(await dialog().evaluate(el=>el.scrollWidth<=el.clientWidth),'Packet form overflows mobile viewport');
+  await dialog().getByRole('button',{name:'Save',exact:true}).click();await closed();
+  await page.getByLabel('Find a packet',{exact:true}).fill('community');
+  await page.getByRole('link',{name:'Open packet ↗',exact:true}).click();
+  await page.getByRole('heading',{name:'Origins & storage',exact:true}).waitFor();
+  const vaultUrl=new URL(page.url()).pathname+new URL(page.url()).search;
+  await page.getByText('Acquired: Sep 27, 2026',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'+ Record attempt',exact:true}).click();
+  await dialog().getByLabel('Started on',{exact:true}).fill('2026-09-27');
+  await dialog().getByLabel('Seeds sown',{exact:true}).fill('4');
+  await dialog().getByLabel('Attempt notes',{exact:true}).fill('First batch <notes>');
+  assert.ok(await dialog().evaluate(el=>el.scrollWidth<=el.clientWidth),'Attempt form overflows mobile viewport');
+  await dialog().getByRole('button',{name:'Save',exact:true}).click();await closed();
+  await page.getByText('Pending',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Edit attempt',exact:true}).click();
+  await dialog().getByLabel('Seeds germinated',{exact:true}).fill('3');
+  await dialog().getByRole('button',{name:'Save',exact:true}).click();await closed();
+  await page.getByRole('heading',{name:'75% germinated',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Add plant from attempt',exact:true}).click();
+  assert.equal(await dialog().getByLabel('Strain',{exact:true}).inputValue(),'Browser cross');
+  assert.equal(await dialog().getByLabel('Seed packet',{exact:true}).locator('option:checked').textContent(),'Vault tomato · Lot 01');
+  assert.match(await dialog().getByLabel('Germination attempt',{exact:true}).locator('option:checked').textContent(),/4 sown/);
+  await dialog().getByLabel('Name',{exact:true}).fill('Vault seedling');
+  await dialog().getByRole('button',{name:'Save',exact:true}).click();await closed();
+  await page.getByRole('link',{name:'♧ Vault seedling',exact:true}).click();
+  await page.getByRole('heading',{name:'Seed origin',exact:true}).waitFor();
+  await page.reload();await page.getByRole('heading',{name:'Seed origin',exact:true}).waitFor();
+  await page.getByRole('link',{name:'❧ Vault tomato · Lot 01 ↗',exact:true}).click();
+  await page.getByRole('heading',{name:'Plants from this packet',exact:true}).waitFor();
+  await page.screenshot({path:join(artifacts,'seed-vault-mobile.png'),fullPage:true});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Packet detail overflows mobile viewport');
+  // Existing plants can be linked to a packet without assigning an attempt.
+  await go('/plants');await page.getByRole('link',{name:'Monstera',exact:true}).click();
+  await page.getByRole('button',{name:'Edit plant',exact:true}).click();
+  await dialog().getByLabel('Seed packet',{exact:true}).selectOption({label:'Vault tomato · Lot 01'});
+  await dialog().getByRole('button',{name:'Save',exact:true}).click();await closed();
+  await page.getByText('No germination attempt linked.',{exact:true}).waitFor();
   const appearanceTab=await context.newPage();
   await appearanceTab.goto(base+'/login');
   for (const theme of themeIds.slice(1)) {
@@ -325,7 +413,7 @@ with sqlite3.connect(sys.argv[1]) as db:
     assert.equal(await page.getByLabel('Theme', {exact:true}).inputValue(),theme);
     for (const width of [1440,390]) {
       await page.setViewportSize({width,height:width===390?844:1050});
-      for (const path of ['/','/plants','/seeds','/strains','/strains?view=crosses','/journal','/calendar','/photos','/environment','/equipment','/settings']) {
+      for (const path of ['/','/plants','/seeds',vaultUrl,'/strains','/strains?view=crosses','/journal','/calendar','/photos','/environment','/equipment','/settings']) {
         await go(path);
         assert.equal(await page.locator('html').getAttribute('data-theme'),theme);
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${theme} overflow at ${width}px on ${path}`);
@@ -333,9 +421,14 @@ with sqlite3.connect(sys.argv[1]) as db:
           await page.screenshot({path:join(artifacts,`${theme}-${path.slice(1)||'overview'}-${width}.png`),fullPage:path!=='/strains'});
         }
       }
+      await go('/strains');
+      await page.getByRole('button',{name:'Add starter collections',exact:true}).click();
+      await dialog().getByRole('checkbox',{name:'Vegetables',exact:true}).waitFor();
+      assert.ok(await dialog().evaluate(el=>el.scrollWidth<=el.clientWidth),`${theme} catalog choices overflow at ${width}px`);
+      await dialog().getByRole('button',{name:'Cancel',exact:true}).click();await closed();
       await go('/plants');
       await page.getByRole('button',{name:'+ Add a plant',exact:true}).click();
-      assert.ok(await dialog().isVisible());
+      await dialog().waitFor({state:'visible'});
       assert.ok(await dialog().evaluate(el=>el.scrollWidth<=el.clientWidth),`${theme} dialog overflow at ${width}px`);
       await dialog().getByRole('button',{name:'Cancel',exact:true}).click();await closed();
     }

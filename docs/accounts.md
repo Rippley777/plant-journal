@@ -1,7 +1,21 @@
 # Accounts and shared gardens
 
 Anyone can sign up with an email and a password of 12–128 characters. Signup
-creates a private garden. Users may create more gardens and switch between gardens
+creates a private garden. The optional starter collection picker offers vegetables,
+herbs, flowers, fruit and berries, houseplants, and cannabis. Nothing is selected
+by default. Choose any combination or start with an empty collection. The same
+picker is available when creating another garden; collections belong to that
+garden, not every garden the account joins.
+
+Use **Collection → Add starter collections** or the Settings shortcut to add more.
+Cards begin unowned, while existing cards retain their status and notes. A linked
+plant or positive seed quantity marks a card collected. Choosing a starter pack
+does not add plants or seed stock. Collections import once, so retrying never
+restores cards you deliberately removed. Account, garden, and starter-card creation
+commit together. The API accepts an optional `catalogs` array on signup and garden
+creation; omitting it or sending `[]` creates an empty collection.
+
+Users may create more gardens and switch between gardens
 from the sidebar. Each garden has one owner; only that owner can add or remove
 registered collaborators under Settings. All collaborators can edit records and
 equipment settings. Permission levels and ownership transfer are not part of this MVP.
@@ -73,6 +87,6 @@ hardware. Connecting separate remote Pis is deferred. Cloud instances with
 `cargo test --locked` includes public signup, reserved-owner protection, login,
 logout, expired/forged sessions, garden isolation, cross-garden link rejection,
 collaboration, equipment access, membership removal, password reset, and populated
-legacy migration checks. The browser test covers signup/login/logout, adding and
+legacy migration checks. The browser test covers optional starter choices, mixed collections, plant-type filtering, signup/login/logout, adding and
 removing collaborators, garden switching, and the existing journal workflows.
 The live Azure SQL contract test remains opt-in and needs a dedicated test database.

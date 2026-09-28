@@ -1,3 +1,27 @@
+.signup-page .auth-main {max-width:760px}
+.catalog-choices {min-width:0;border:1px solid var(--line);border-radius:12px;padding:16px;margin:0}
+.catalog-choices legend {padding:0 8px;font-weight:600}
+.catalog-choice-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}
+.catalog-choice {display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);cursor:pointer;min-width:0}
+.catalog-choice input {flex:0 0 auto;width:18px;height:18px;margin:3px 0;accent-color:var(--green)}
+.catalog-choice > span {min-width:0;display:grid;gap:7px}
+.catalog-choice:has(input:checked) {border-color:var(--green);background:var(--sage)}
+.catalog-choice:focus-within {outline:2px solid var(--focus);outline-offset:2px}
+.catalog-choice-heading {display:flex;flex-wrap:wrap;align-items:center;gap:6px;justify-content:space-between}
+.catalog-choice .helper {margin:0;display:block;font-weight:400}
+.catalog-examples {font-size:11px;color:var(--muted);font-weight:400;overflow-wrap:anywhere}
+.catalog-choice.is-imported {cursor:default;opacity:.7}
+.collection-toolbar > div {min-width:0}
+.collection-toolbar select {max-width:100%}
+@media(max-width:520px){.catalog-choice-grid{grid-template-columns:1fr}}
+.vault-fields > *, .vault-origin {min-width:0}
+.vault-fields :is(input,select), .vault-origin select {width:100%;min-width:0}
+.vault-origin {border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:10px;margin:0}
+.vault-origin legend {padding:0 8px;font-weight:600}
+.vault-banner {display:flex;align-items:center;justify-content:space-between;gap:20px;background:var(--sage)}
+.vault-mark {font-size:72px;color:var(--green);line-height:1}
+.vault-card {overflow-wrap:anywhere}
+#vault-search {width:100%;min-width:0}
 :root {
   color-scheme: light;
   --button-text: white;

@@ -1,6 +1,6 @@
 # Strain collection and lineage
 
-Use **Strains** in the sidebar to browse your garden's card binder. Unowned and
+Use **Collection** in the sidebar to browse your garden's card binder. Unowned and
 wanted cards have gray artwork; collected cards show their full color. Search
 names, species, breeders, and parent names, or filter by collection status.
 Card artwork is an original botanical emblem, not a photograph of the cultivar.
@@ -31,7 +31,7 @@ Card artwork is an original botanical emblem, not a photograph of the cultivar.
 
 ## Cross planner
 
-Open **Strains → Cross planner → Plan a cross**. Choose two strains already in the
+Open **Collection → Cross planner → Plan a cross**. Choose two strains already in the
 garden's collection, give the plan a working name, and add optional species,
 breeder, and notes. Parent order does not imply sex, and the same strain may fill
 both slots. Save and edit plans without adding strain cards or collecting parents.
@@ -47,11 +47,49 @@ Use **Show crosses** to view planned, created, or all crosses. Plans belong to t
 selected garden and follow the same collaborator access as strain records. A plan
 records intended parentage; it does not predict the traits of the resulting cross.
 
-## Starter binder
+## Optional starter collections
+
+Signup and **New garden** offer six optional packs. All are unchecked initially.
+Choose any combination, or start empty and use **Collection → Add starter
+collections** later. Settings has the same shortcut. The **Plant type** filter
+narrows mixed collections to tomatoes, basil, strawberries, cannabis, and more.
+
+| Pack | Cards |
+| --- | ---: |
+| Vegetables | 20 |
+| Herbs | 16 |
+| Flowers | 12 |
+| Fruit & berries | 12 |
+| Houseplants | 8 |
+| Cannabis | 152 |
+
+The 68 new entries are in [garden-catalogs.json](../resources/garden-catalogs.json).
+Names include the crop to distinguish unrelated varieties with the same name.
+The existing `species` field holds the plant type used by the filter. Each new
+entry links to its catalog or horticultural reference; no care descriptions,
+photos, or undocumented parentage are copied into the app.
+
+References include [Johnny's Selected Seeds](https://www.johnnyseeds.com/herbs/basil/),
+[UC Agriculture and Natural Resources](https://ucanr.edu/sites/default/files/2026-04/2026%20Plant%20Sale%20List%20Veggies.pdf),
+[West Coast Seeds](https://www.westcoastseeds.com/products/little-gem),
+[University of Minnesota Extension](https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-strawberries-in-the-home-garden),
+and the [Royal Horticultural Society](https://www.rhs.org.uk/plants/epipremnum).
+The cards are a curated starting library, not a guarantee of suitability for a
+particular climate. Breeder and ancestry fields stay empty where undocumented.
+
+Each pack imports once per garden in a transaction. Imports skip existing names
+without changing notes, status, or parent links. Repeating a request does not
+restore deleted cards. Newly imported cards start unowned; link your plants and
+seed packets explicitly or mark a card collected. Imports do not guess ownership
+from general crop names or create inventory. A selection that would exceed the
+1,000-card garden limit is rejected in full. Garden collaborators share the same
+collection and can add packs using their existing editing permissions.
+
+## Original owner's starter binder
 
 On the first application startup after schema migration, the existing original
 garden owned by `ally.rippley@gmail.com` gets 152 starter cards. Other gardens and
-accounts are not prepopulated. This is a curated starting set of familiar cannabis
+accounts receive only the packs they explicitly choose. This is a curated starting set of familiar cannabis
 names and ancestry records, not an exhaustive or ranked worldwide popularity list.
 
 The original 52 records are in [starter-strains.json](../resources/starter-strains.json);
@@ -83,7 +121,9 @@ recreating deleted cards.
 
 ## Database upgrade
 
-Schema version 7 adds `cross_plans` with garden-scoped parent links and an optional
+Schema version 9 adds `garden_catalog_imports` to remember each chosen pack. It
+recognizes prior cannabis imports so deleted cards stay deleted. Older SQLite
+imports without this table remain supported. Schema version 7 adds `cross_plans` with garden-scoped parent links and an optional
 reference to the created strain. Schema version 6 tracks the catalog import version so existing gardens receive the
 new cards once. Schema version 5 adds `strains`, `strain_catalog_imports`, and nullable `strain_id`
 columns on `plants` and `seeds`. A strain has two optional references to parent
@@ -102,3 +142,12 @@ Plan writes require `name`, `parent_one_id`, and `parent_two_id`, with optional
 `species`, `breeder`, and `notes`. `POST /api/v1/cross-plans/{id}/convert` accepts a
 JSON object with optional overrides for name, species, breeder, and notes. It
 returns the strain `id` (201 when created; 200 when already converted).
+
+
+`GET /api/v1/catalogs` is public and exposes only built-in pack metadata.
+`GET /api/v1/catalogs/imports` and `POST /api/v1/catalogs/import` require membership
+in the selected garden. The POST body is `{ "catalogs": ["vegetables", "herbs"] }`;
+valid IDs are `vegetables`, `herbs`, `flowers`, `fruit`, `houseplants`, `cannabis`.
+The response is `{ "added": 36, "imported": ["vegetables", "herbs"] }` on an empty
+garden. Repeated imports return zero additions. Signup and garden creation accept
+the same optional `catalogs` array.

@@ -126,7 +126,11 @@ pub async fn protect(State(app): State<Arc<App>>, mut req: Request, next: Next) 
         || path.starts_with("/assets/")
         || matches!(
             path,
-            "/login" | "/signup" | "/api/v1/auth/login" | "/api/v1/auth/signup"
+            "/login"
+                | "/signup"
+                | "/api/v1/auth/login"
+                | "/api/v1/auth/signup"
+                | "/api/v1/catalogs"
         )
     {
         return next.run(req).await;
@@ -201,6 +205,14 @@ pub struct Credentials {
     email: String,
     password: String,
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignupInput {
+    email: String,
+    password: String,
+    #[serde(default)]
+    catalogs: Vec<String>,
+}
 async fn session(app: &App, user_id: &str, garden: &str) -> Result<Response> {
     let mut random = [0u8; 32];
     OsRng.fill_bytes(&mut random);
@@ -236,8 +248,9 @@ async fn session(app: &App, user_id: &str, garden: &str) -> Result<Response> {
 }
 pub async fn signup(
     State(app): State<Arc<App>>,
-    Json(input): Json<Credentials>,
+    Json(input): Json<SignupInput>,
 ) -> Result<Response> {
+    crate::catalogs::validate_selection(&input.catalogs).map_err(bad)?;
     let email = email(&input.email)?;
     rate_limit(&email)?;
     if !(12..=128).contains(&input.password.chars().count()) {
@@ -264,6 +277,10 @@ pub async fn signup(
         .execute(&mut tx)
         .await?;
     create_garden(&mut tx, &garden, &user, "My garden").await?;
+    crate::catalogs::prepare(&mut tx, &garden, &input.catalogs)
+        .await?
+        .apply(&mut tx, &garden)
+        .await?;
     tx.commit().await?;
     session(&app, &user, &garden).await
 }
@@ -370,18 +387,25 @@ async fn create_garden(
 #[serde(deny_unknown_fields)]
 pub struct GardenInput {
     name: String,
+    #[serde(default)]
+    catalogs: Vec<String>,
 }
 pub async fn new_garden(
     State(app): State<Arc<App>>,
     Extension(user): Extension<Identity>,
     Json(input): Json<GardenInput>,
 ) -> Result<Json<Value>> {
+    crate::catalogs::validate_selection(&input.catalogs).map_err(bad)?;
     if input.name.trim().is_empty() || input.name.len() > 120 {
         return Err(bad("Garden name must contain 1–120 characters"));
     }
     let id = store::id();
     let mut tx = app.pool.begin().await?;
     create_garden(&mut tx, &id, &user.user_id, input.name.trim()).await?;
+    crate::catalogs::prepare(&mut tx, &id, &input.catalogs)
+        .await?
+        .apply(&mut tx, &id)
+        .await?;
     tx.commit().await?;
     Ok(Json(json!({"id":id})))
 }

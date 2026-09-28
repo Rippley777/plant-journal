@@ -2,6 +2,7 @@ pub mod adapters;
 pub mod api;
 pub mod auth;
 pub mod automation;
+pub mod catalogs;
 pub mod config;
 pub mod crosses;
 pub mod database;
@@ -9,6 +10,7 @@ pub mod import;
 pub mod models;
 pub mod store;
 pub mod strains;
+pub mod vault;
 
 use adapters::{Camera, Sensor, Switch};
 use config::Config;

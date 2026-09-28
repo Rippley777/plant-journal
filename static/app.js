@@ -44,48 +44,15 @@ function modal(title, contents, submit) {
   });
 }
 function formWrap(contents, label='Save') {return `<form class="form-grid">${contents}<div class="form-error" role="alert"></div><div class="row"><button type="submit">${label}</button><button type="button" class="secondary" data-action="close">Cancel</button></div></form>`;}
-function plantEditor(id) {
+async function plantEditor(id, origin = {}) {
+  await loadVault();
   const plant=plants.find(p=>p.id===id);
-  modal(plant?'Edit plant':'Welcome a new plant',formWrap(`<label>Name<input name="name" required maxlength="120" value="${esc(plant?.name)}" placeholder="e.g. The little monstera"></label><label>Species or variety<input name="species" maxlength="160" value="${esc(plant?.species)}" placeholder="Monstera deliciosa"></label>${strainPicker(plant?.strain_id)}<label>Plant notes<textarea name="notes" maxlength="10000" placeholder="Where it lives, when you brought it home, things to remember…">${esc(plant?.notes)}</textarea></label>${plant?`<label class="check-label"><input type="checkbox" name="archived" ${plant.archived?'checked':''}>Archive plant (keep its history)</label>`:''}`),async data=>{
-    await api('/plants'+(plant?'/'+plant.id:''),plant?'PUT':'POST',{name:data.get('name'),species:data.get('species'),notes:data.get('notes'),archived:data.has('archived'),strain_id:await resolveStrainName(data)});notice(plant?'Plant updated.':'Your plant is ready for its first entry.');
+  const source=plant || origin;
+  const packet=currentSeeds.find(s=>s.id===source.seed_id);
+  modal(plant?'Edit plant':'Welcome a new plant',formWrap(`<label>Name<input name="name" required maxlength="120" value="${esc(plant?.name)}" placeholder="e.g. The little monstera"></label><label>Species or variety<input name="species" maxlength="160" value="${esc(plant?.species)}" placeholder="Monstera deliciosa"></label>${strainPicker(plant?.strain_id || (!plant && packet?.strain_id))}${originPicker(source)}<label>Plant notes<textarea name="notes" maxlength="10000" placeholder="Where it lives, when you brought it home, things to remember…">${esc(plant?.notes)}</textarea></label>${plant?`<label class="check-label"><input type="checkbox" name="archived" ${plant.archived?'checked':''}>Archive plant (keep its history)</label>`:''}`),async data=>{
+    await api('/plants'+(plant?'/'+plant.id:''),plant?'PUT':'POST',{name:data.get('name'),species:data.get('species'),notes:data.get('notes'),archived:data.has('archived'),strain_id:await resolveStrainName(data),seed_id:data.get('seed_id')||null,germination_id:data.get('germination_id')||null});notice(plant?'Plant updated.':'Your plant is ready for its first entry.');
   });
-}
-let currentSeeds = [];
-function seedEditor(id) {
-  const seed = currentSeeds.find(s => s.id === id);
-  modal(seed ? 'Edit seeds' : 'Add seeds', formWrap(`
-    <div class="grid two-col"><label>Name<input name="name" required maxlength="120" value="${esc(seed?.name)}" placeholder="e.g. Tomato"></label><label>Variety<input name="variety" maxlength="160" value="${esc(seed?.variety)}" placeholder="e.g. Cherokee Purple"></label></div>
-    <div class="grid two-col"><label>Quantity on hand<input name="quantity" type="number" required min="0" max="1000000000" step="1" value="${seed?.quantity ?? 1}"></label><label>Unit<select name="unit"><option value="seeds" ${seed?.unit==='seeds'?'selected':''}>Seeds</option><option value="packets" ${(!seed || seed.unit==='packets')?'selected':''}>Packets</option></select></label></div>
-    <div class="grid two-col"><label>Supplier<input name="supplier" maxlength="160" value="${esc(seed?.supplier)}"></label><label>Purchase year<input name="purchase_year" type="number" min="1900" max="2100" step="1" value="${esc(seed?.purchase_year)}"></label></div>
-    ${strainPicker(seed?.strain_id)}
-    <label>Storage location<input name="storage_location" maxlength="160" value="${esc(seed?.storage_location)}" placeholder="e.g. Fridge, seed box"></label>
-    <label>Notes<textarea name="notes" maxlength="10000" placeholder="Sowing instructions, germination results, or anything to remember…">${esc(seed?.notes)}</textarea></label>`), async data => {
-    await api('/seeds' + (seed ? '/' + seed.id : ''), seed ? 'PUT' : 'POST', {
-      strain_id: await resolveStrainName(data), name: data.get('name'), variety: data.get('variety'), quantity: Number(data.get('quantity')),
-      unit: data.get('unit'), supplier: data.get('supplier'),
-      purchase_year: data.get('purchase_year') ? Number(data.get('purchase_year')) : null,
-      storage_location: data.get('storage_location'), notes: data.get('notes')
-    });
-    notice('Seed inventory saved.');
-  });
-}
-async function seedsPage() {
-  heading('What’s tucked away for your next growing season.', button('+ Add seeds', 'seed'));
-  [currentSeeds, currentPhotos] = await Promise.all([api('/seeds'), api('/photos')]);
-  $('#content').innerHTML = currentSeeds.length ? `<div class="grid three-col">${currentSeeds.map(seed => `
-    <article class="card card-body"><div class="row spread"><h2>${esc(seed.name)}</h2><span class="badge ${seed.quantity===0?'warn':''}">${seed.quantity===0?'Out of stock':`${seed.quantity} ${esc(seed.unit)}`}</span></div>
-    <p class="muted">${esc(seed.variety || 'No variety recorded')}</p>${strainTags(seed.strain_id)}
-    ${seed.supplier?`<p>Supplier: ${esc(seed.supplier)}</p>`:''}
-    ${seed.purchase_year?`<p>Purchased: ${seed.purchase_year}</p>`:''}
-    ${seed.storage_location?`<p>Stored: ${esc(seed.storage_location)}</p>`:''}
-    ${seed.notes?`<p class="entry-text">${esc(seed.notes)}</p>`:''}
-    <div class="row section-space">${button('Add photo','upload-seed',seed.id,'secondary small')}${button('Edit','seed',seed.id,'secondary small')}${button('Delete','delete-seed',seed.id,'secondary small')}</div>${currentPhotos.some(p=>p.seed_ids.includes(seed.id))?`<div class="grid section-space">${photoCards(currentPhotos.filter(p=>p.seed_ids.includes(seed.id)))}</div>`:''}</article>`).join('')}</div>` : empty('Your next season starts here', 'Keep track of seed packets, varieties, and what you have left.', button('+ Add your first seeds', 'seed'));
-}
-function deleteSeed(id) {
-  const seed = currentSeeds.find(s => s.id === id);
-  modal('Delete seeds?', formWrap(`<p>Remove ${esc(seed.name)} from your seed inventory? This cannot be undone.</p>`, 'Delete permanently'), async () => {
-    await api('/seeds/' + id, 'DELETE');notice('Seeds removed.');
-  });
+  bindOriginPicker();
 }
 
 function entryEditor(id) {
@@ -138,7 +105,8 @@ async function plantsPage() {
     heading(plant.species||'A growing story.',button('Edit plant','plant',plant.id,'secondary'));
     $('h1').textContent=plant.name;
     const [entries,photos]=await Promise.all([api('/entries?plant='+plant.id),api('/photos?plant='+plant.id)]);currentEntries=entries;currentPhotos=photos;
-    $('#content').innerHTML=`<div class="toolbar"><a href="/plants" class="muted">← All plants</a>${plant.archived?'<span class="badge warn">Archived · history retained</span>':button('+ Add an entry','entry')}</div><section class="card card-body"><h2>Plant notes</h2>${strainTags(plant.strain_id)}<p class="profile-description">${esc(plant.notes||'The story starts here.')}</p><p class="muted">Added ${esc(formatDate(plant.created_at,{year:'numeric'}))}</p></section>${plant.strain_id?lineageSection(plant.strain_id):`<section class="card card-body section-space"><h2>Strain & ancestry</h2><p class="muted">Link this plant to a strain to see its family tree and unlock its collection card.</p>${button('Link a strain','plant',plant.id,'secondary small')}</section>`}<div class="grid two-col section-space"><section><h2>Journal</h2><div class="section-space">${journalCards(entries)}</div></section><section><div class="row spread"><h2>Photo history</h2>${button('Add photo','upload-plant',plant.id,'secondary small')}</div><div class="grid section-space">${photoCards(photos)}</div></section></div>`;if(plant.strain_id)bindLineage(plant.strain_id);return;
+    if(plant.seed_id)await loadVault();
+    $('#content').innerHTML=`<div class="toolbar"><a href="/plants" class="muted">← All plants</a>${plant.archived?'<span class="badge warn">Archived · history retained</span>':button('+ Add an entry','entry')}</div><section class="card card-body"><h2>Plant notes</h2>${strainTags(plant.strain_id)}<p class="profile-description">${esc(plant.notes||'The story starts here.')}</p><p class="muted">Added ${esc(formatDate(plant.created_at,{year:'numeric'}))}</p></section>${originSection(plant)}${plant.strain_id?lineageSection(plant.strain_id):`<section class="card card-body section-space"><h2>Strain & ancestry</h2><p class="muted">Link this plant to a strain to see its family tree and unlock its collection card.</p>${button('Link a strain','plant',plant.id,'secondary small')}</section>`}<div class="grid two-col section-space"><section><h2>Journal</h2><div class="section-space">${journalCards(entries)}</div></section><section><div class="row spread"><h2>Photo history</h2>${button('Add photo','upload-plant',plant.id,'secondary small')}</div><div class="grid section-space">${photoCards(photos)}</div></section></div>`;if(plant.strain_id)bindLineage(plant.strain_id);return;
   }
   selectedPlant='';heading('Every plant has a story. Keep yours here.',button('+ Add a plant','plant'));
   $('#content').innerHTML=plants.length?`<div class="grid three-col">${plants.map(p=>`<article class="card plant-card ${p.archived?'archived':''}">${p.cover_photo_id?`<a class="plant-art plant-cover" href="/plants?plant=${p.id}"><img src="/api/v1/photos/${p.cover_photo_id}/image" alt="Latest photo of ${esc(p.name)}" loading="lazy"></a>`:`<div class="plant-art" aria-hidden="true">♧</div>`}<div class="card-body"><div class="row spread"><h3><a href="/plants?plant=${p.id}">${esc(p.name)}</a></h3>${p.archived?'<span class="badge">Archived</span>':''}</div><p class="muted">${esc(p.species||'A new addition')}</p>${strainTags(p.strain_id)}<div class="row spread"><a class="muted" href="/plants?plant=${p.id}">View plant journal ↗</a>${button('Add photo','upload-plant',p.id,'secondary small')}${button('Edit','plant',p.id,'secondary small')}</div></div></article>`).join('')}</div>`:empty('Your grow space starts here','Add a plant to begin collecting notes, care, and photos.',button('+ Add your first plant','plant'));
@@ -219,6 +187,7 @@ async function settingsPage() {
     const saved = theme.select(event.target.value);
     notice(saved ? `${theme.themes[theme.current()].label} theme saved for this browser.` : 'Theme applied for this page. Browser storage is unavailable, so it could not be saved.');
   });
+  $('#content').insertAdjacentHTML('beforeend', `<section class="card card-body section-space"><h2>Starter collections</h2><p class="muted">Add vegetables, herbs, flowers, fruit, houseplants, or cannabis to this garden’s card collection.</p>${button('Add starter collections','catalogs','','secondary')}</section>`);
   await membershipPanel();
   $('#settings-form').addEventListener('submit',async event=>{
     event.preventDefault();const form=event.target;const data=new FormData(form);const submit=$('button[type=submit]',form);submit.disabled=true;
@@ -239,10 +208,15 @@ document.addEventListener('click',event=>{
   const {action,id}=target.dataset;
   run(async()=>{
     if(action==='logout'){await api('/auth/logout','POST',{});sessionStorage.removeItem('garden_id');location.assign('/login');return;}
-    if(action==='new-garden')newGarden();
+    if(action==='new-garden')await newGarden();
+    if(action==='catalogs')await catalogEditor();
     if(action==='add-member')addMember();
     if(action==='remove-member')removeMember(id);
-    if(action==='plant')plantEditor(id);
+    if(action==='plant')await plantEditor(id);
+    if(action==='packet-plant')await plantEditor('',{seed_id:id});
+    if(action==='attempt-plant'){const a=currentAttempts.find(a=>a.id===id);await plantEditor('',{seed_id:a.seed_id,germination_id:id});}
+    if(action==='germination')attemptEditor(id);
+    if(action==='delete-attempt')deleteAttempt(id);
     if(action==='upload-plant')uploadPhoto('plant',id);
     if(action==='upload-seed')uploadPhoto('seed',id);
     if(action==='seed')seedEditor(id);
@@ -305,13 +279,15 @@ $('#garden-select').addEventListener('change', event => run(async () => {
   sessionStorage.setItem('garden_id',id);
   location.assign('/');
 }));
-function newGarden() {
-  modal('Create a garden', formWrap('<label>Garden name<input name="name" required maxlength="120" placeholder="My balcony garden"></label>','Create garden'),async data => {
-    const garden = await api('/gardens','POST',{name:data.get('name')});
+async function newGarden() {
+  const catalogs=await api('/catalogs');
+  modal('Create a garden', formWrap(`<label>Garden name<input name="name" required maxlength="120" placeholder="My balcony garden"></label>${CatalogChoices.markup(catalogs)}`,'Create garden'),async data => {
+    const garden = await api('/gardens','POST',{name:data.get('name'),catalogs:data.getAll('catalogs')});
     await api('/gardens/'+garden.id+'/select','POST',{});
     sessionStorage.setItem('garden_id',garden.id);
     location.assign('/');
   });
+  CatalogChoices.bind($('#dialog-body'));
 }
 async function membershipPanel() {
   if (!currentGarden()?.is_owner) {

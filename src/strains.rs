@@ -274,15 +274,22 @@ pub async fn delete(
 }
 
 #[derive(Deserialize)]
-struct Starter {
-    name: String,
-    aliases: Vec<String>,
-    parents: Vec<String>,
-    source_url: String,
+pub(crate) struct Starter {
+    pub name: String,
     #[serde(default)]
-    breeder: String,
+    pub aliases: Vec<String>,
     #[serde(default)]
-    lineage_note: String,
+    pub parents: Vec<String>,
+    pub source_url: String,
+    #[serde(default = "cannabis_species")]
+    pub species: String,
+    #[serde(default)]
+    pub breeder: String,
+    #[serde(default)]
+    pub lineage_note: String,
+}
+fn cannabis_species() -> String {
+    "Cannabis".into()
 }
 pub async fn seed_starter_collection(pool: &Database) -> anyhow::Result<()> {
     let garden = crate::auth::LEGACY_GARDEN;
@@ -313,16 +320,37 @@ pub async fn seed_starter_collection(pool: &Database) -> anyhow::Result<()> {
     catalog.extend(serde_json::from_str::<Vec<Starter>>(include_str!(
         "../resources/expanded-strains.json"
     ))?);
+    insert_catalog(&mut tx, garden, &catalog, true).await?;
+    if version == 0 {
+        db::query("INSERT INTO strain_catalog_imports(garden_id,imported_at,catalog_version) VALUES(?,?,2)")
+            .bind(garden).bind(Utc::now().timestamp()).execute(&mut tx).await?;
+    } else {
+        db::query("UPDATE strain_catalog_imports SET catalog_version=2 WHERE garden_id=?")
+            .bind(garden)
+            .execute(&mut tx)
+            .await?;
+    }
+    tx.commit().await
+}
+
+/// Caller holds the garden lock; existing records and parent edges are preserved.
+pub(crate) async fn insert_catalog(
+    tx: &mut Transaction,
+    garden: &str,
+    catalog: &[Starter],
+    match_inventory: bool,
+) -> anyhow::Result<usize> {
     let existing: Vec<Strain> = db::query_as("SELECT * FROM strains WHERE garden_id=?")
         .bind(garden)
-        .fetch_all(&mut tx)
+        .fetch_all(&mut *tx)
         .await?;
     let mut ids: HashMap<String, String> = existing
         .iter()
         .map(|s| (name_key(&s.name), s.id.clone()))
         .collect();
     let mut inserted = HashSet::new();
-    for strain in &catalog {
+    let mut records = Vec::new();
+    for strain in catalog {
         let key = name_key(&strain.name);
         if ids.contains_key(&key) {
             continue;
@@ -335,14 +363,34 @@ pub async fn seed_starter_collection(pool: &Database) -> anyhow::Result<()> {
         } else {
             "Reported catalog lineage, not verified for your particular seeds or cut. Edit to match your records."
         };
-        db::query("INSERT INTO strains(id,garden_id,name,name_key,species,breeder,status,lineage_note,source_url,created_at) VALUES(?,?,?,?,'Cannabis',?,'unowned',?,?,?)")
-            .bind(&id).bind(garden).bind(&strain.name).bind(&key).bind(&strain.breeder).bind(note).bind(&strain.source_url).bind(Utc::now().timestamp()).execute(&mut tx).await?;
+        records.push((id.clone(), key.clone(), strain, note));
         inserted.insert(id.clone());
         ids.insert(key, id);
     }
-    for strain in &catalog {
+    // Bound values in small batches keep Azure imports responsive and stay below
+    // SQL Server's parameter limit without interpolating catalog text into SQL.
+    let now = Utc::now().timestamp();
+    for chunk in records.chunks(50) {
+        let values = vec!["(?,?,?,?,?,?,'unowned',?,?,?)"; chunk.len()].join(",");
+        let sql=format!("INSERT INTO strains(id,garden_id,name,name_key,species,breeder,status,lineage_note,source_url,created_at) VALUES{values}");
+        let mut query = db::query(&sql);
+        for (id, key, strain, note) in chunk {
+            query = query
+                .bind(id)
+                .bind(garden)
+                .bind(&strain.name)
+                .bind(key)
+                .bind(&strain.species)
+                .bind(&strain.breeder)
+                .bind(*note)
+                .bind(&strain.source_url)
+                .bind(now);
+        }
+        query.execute(&mut *tx).await?;
+    }
+    for strain in catalog {
         let id = &ids[&name_key(&strain.name)];
-        if inserted.contains(id) {
+        if inserted.contains(id) && !strain.parents.is_empty() {
             let parents: Vec<_> = strain
                 .parents
                 .iter()
@@ -352,55 +400,50 @@ pub async fn seed_starter_collection(pool: &Database) -> anyhow::Result<()> {
                 .bind(parents.first().copied())
                 .bind(parents.get(1).copied())
                 .bind(id)
-                .execute(&mut tx)
+                .execute(&mut *tx)
                 .await?;
         }
     }
-    let mut matches = HashMap::new();
     let mut newly_linked = HashSet::new();
-    for strain in &catalog {
-        for name in std::iter::once(&strain.name).chain(strain.aliases.iter()) {
-            matches.insert(name_key(name), ids[&name_key(&strain.name)].clone());
-        }
-    }
-    // Match full names only; never guess lineage from a substring or overwrite an existing link.
-    for (table, field) in [("plants", "species"), ("seeds", "variety")] {
-        let rows:Vec<db::Record>=db::query_as(&format!("SELECT id,name,{field} AS variety FROM {table} WHERE garden_id=? AND strain_id IS NULL"))
-            .bind(garden).fetch_all(&mut tx).await?;
-        for row in rows {
-            let record_id: String = row.get("id")?;
-            let name: String = row.get("name")?;
-            let variety: String = row.get("variety")?;
-            let by_name = matches.get(&name_key(&name));
-            let by_variety = matches.get(&name_key(&variety));
-            if by_name.is_some() && by_variety.is_some() && by_name != by_variety {
-                continue;
-            }
-            if let Some(strain) = by_variety.or(by_name) {
-                db::query(&format!(
-                    "UPDATE {table} SET strain_id=? WHERE id=? AND garden_id=?"
-                ))
-                .bind(strain)
-                .bind(record_id)
-                .bind(garden)
-                .execute(&mut tx)
-                .await?;
-                newly_linked.insert(strain.clone());
+    if match_inventory {
+        let mut matches = HashMap::new();
+        for strain in catalog {
+            for name in std::iter::once(&strain.name).chain(strain.aliases.iter()) {
+                matches.insert(name_key(name), ids[&name_key(&strain.name)].clone());
             }
         }
+        // Match full names only; never guess lineage from a substring or overwrite an existing link.
+        for (table, field) in [("plants", "species"), ("seeds", "variety")] {
+            let rows:Vec<db::Record>=db::query_as(&format!("SELECT id,name,{field} AS variety FROM {table} WHERE garden_id=? AND strain_id IS NULL"))
+            .bind(garden).fetch_all(&mut *tx).await?;
+            for row in rows {
+                let record_id: String = row.get("id")?;
+                let name: String = row.get("name")?;
+                let variety: String = row.get("variety")?;
+                let by_name = matches.get(&name_key(&name));
+                let by_variety = matches.get(&name_key(&variety));
+                if by_name.is_some() && by_variety.is_some() && by_name != by_variety {
+                    continue;
+                }
+                if let Some(strain) = by_variety.or(by_name) {
+                    db::query(&format!(
+                        "UPDATE {table} SET strain_id=? WHERE id=? AND garden_id=?"
+                    ))
+                    .bind(strain)
+                    .bind(record_id)
+                    .bind(garden)
+                    .execute(&mut *tx)
+                    .await?;
+                    newly_linked.insert(strain.clone());
+                }
+            }
+        }
     }
-    for id in inserted.iter().chain(newly_linked.iter()) {
-        db::query("UPDATE strains SET status='collected' WHERE id=? AND garden_id=? AND (EXISTS(SELECT 1 FROM plants p WHERE p.strain_id=strains.id) OR EXISTS(SELECT 1 FROM seeds s WHERE s.strain_id=strains.id AND s.quantity>0))")
-            .bind(id).bind(garden).execute(&mut tx).await?;
+    if match_inventory {
+        for id in inserted.iter().chain(newly_linked.iter()) {
+            db::query("UPDATE strains SET status='collected' WHERE id=? AND garden_id=? AND (EXISTS(SELECT 1 FROM plants p WHERE p.strain_id=strains.id) OR EXISTS(SELECT 1 FROM seeds s WHERE s.strain_id=strains.id AND s.quantity>0))")
+            .bind(id).bind(garden).execute(&mut *tx).await?;
+        }
     }
-    if version == 0 {
-        db::query("INSERT INTO strain_catalog_imports(garden_id,imported_at,catalog_version) VALUES(?,?,2)")
-            .bind(garden).bind(Utc::now().timestamp()).execute(&mut tx).await?;
-    } else {
-        db::query("UPDATE strain_catalog_imports SET catalog_version=2 WHERE garden_id=?")
-            .bind(garden)
-            .execute(&mut tx)
-            .await?;
-    }
-    tx.commit().await
+    Ok(inserted.len())
 }

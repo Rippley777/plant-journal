@@ -625,3 +625,281 @@ async fn repeated_account_attempts_are_rate_limited() {
         StatusCode::TOO_MANY_REQUESTS
     );
 }
+
+#[tokio::test]
+async fn signup_catalogs_are_optional_atomic_and_private() {
+    let (_dir, app, mut client) = setup().await;
+    let (status, choices, _) = client.call("GET", "/api/v1/catalogs", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(choices.as_array().unwrap().len(), 6);
+    assert_eq!(
+        choices
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c["count"].as_u64().unwrap())
+            .sum::<u64>(),
+        220
+    );
+    assert_eq!(
+        client.call("GET", "/api/v1/catalogs/imports", None).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        client
+            .call(
+                "POST",
+                "/api/v1/catalogs/import",
+                Some(json!({"catalogs":["herbs"]}))
+            )
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    let credentials = json!({"email":"starter@example.com","password":"A long testing passphrase","catalogs":["vegetables","herbs","missing"]});
+    assert_eq!(
+        client
+            .call("POST", "/api/v1/auth/signup", Some(credentials.clone()))
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        db::query_scalar::<i64>("SELECT COUNT(*) FROM users WHERE email='starter@example.com'")
+            .fetch_one(&app.pool)
+            .await
+            .unwrap(),
+        0
+    );
+    let mut credentials = credentials;
+    credentials["catalogs"] = json!(["vegetables", "herbs"]);
+    let (status, result, cookie) = client
+        .call("POST", "/api/v1/auth/signup", Some(credentials))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{result}");
+    client.cookie = cookie.split(';').next().unwrap().into();
+    client.garden = result["garden_id"].as_str().unwrap().into();
+    let (_, cards, _) = client.call("GET", "/api/v1/strains", None).await;
+    assert_eq!(cards.as_array().unwrap().len(), 36);
+    assert!(cards
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|c| c["status"] == "unowned" && c["species"] != "Cannabis"));
+    assert!(cards
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|c| c["name"] == "Genovese Basil"));
+    assert_eq!(
+        client.call("GET", "/api/v1/catalogs/imports", None).await.1,
+        json!(["herbs", "vegetables"])
+    );
+    assert_eq!(
+        db::query_scalar::<i64>("SELECT COUNT(*) FROM strains WHERE garden_id=?")
+            .bind(auth::LEGACY_GARDEN)
+            .fetch_one(&app.pool)
+            .await
+            .unwrap(),
+        152
+    );
+    let (status, empty, _) = client
+        .call(
+            "POST",
+            "/api/v1/gardens",
+            Some(json!({"name":"Empty garden"})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    client.garden = empty["id"].as_str().unwrap().into();
+    assert_eq!(
+        client.call("GET", "/api/v1/strains", None).await.1,
+        json!([])
+    );
+    let (status, filled, _) = client
+        .call(
+            "POST",
+            "/api/v1/gardens",
+            Some(json!({"name":"Indoor garden","catalogs":["houseplants"]})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{filled}");
+    client.garden = filled["id"].as_str().unwrap().into();
+    assert_eq!(
+        client
+            .call("GET", "/api/v1/strains", None)
+            .await
+            .1
+            .as_array()
+            .unwrap()
+            .len(),
+        8
+    );
+    client.garden = auth::LEGACY_GARDEN.into();
+    assert_eq!(
+        client
+            .call(
+                "POST",
+                "/api/v1/catalogs/import",
+                Some(json!({"catalogs":["herbs"]}))
+            )
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+}
+
+#[tokio::test]
+async fn starter_imports_preserve_edits_deletions_and_are_concurrency_safe() {
+    let (_dir, app, mut client) = setup().await;
+    client.signup("imports@example.com").await;
+    let card=client.create("/api/v1/strains",json!({"name":" genovese   basil ","species":"Basil","status":"wanted","notes":"Keep my notes"})).await;
+    let request = Some(json!({"catalogs":["herbs","herbs"]}));
+    let (a, b) = tokio::join!(
+        client.call("POST", "/api/v1/catalogs/import", request.clone()),
+        client.call("POST", "/api/v1/catalogs/import", request)
+    );
+    assert_eq!(a.0, StatusCode::OK, "{:?}", a.1);
+    assert_eq!(b.0, StatusCode::OK, "{:?}", b.1);
+    assert_eq!(
+        a.1["added"].as_u64().unwrap() + b.1["added"].as_u64().unwrap(),
+        15
+    );
+    let (_, cards, _) = client.call("GET", "/api/v1/strains", None).await;
+    let saved = cards
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["id"] == card)
+        .unwrap();
+    assert_eq!(saved["notes"], "Keep my notes");
+    assert_eq!(saved["status"], "wanted");
+    assert_eq!(
+        client
+            .call("DELETE", &format!("/api/v1/strains/{card}"), None)
+            .await
+            .0,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        client
+            .call(
+                "POST",
+                "/api/v1/catalogs/import",
+                Some(json!({"catalogs":["herbs"]}))
+            )
+            .await
+            .1["added"],
+        0
+    );
+    assert_eq!(
+        client
+            .call("GET", "/api/v1/strains", None)
+            .await
+            .1
+            .as_array()
+            .unwrap()
+            .len(),
+        15
+    );
+    assert_eq!(
+        client
+            .call(
+                "POST",
+                "/api/v1/catalogs/import",
+                Some(json!({"catalogs":["flowers","invalid"]}))
+            )
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        client.call("GET", "/api/v1/catalogs/imports", None).await.1,
+        json!(["herbs"])
+    );
+    let (status, value, _) = client
+        .call(
+            "POST",
+            "/api/v1/catalogs/import",
+            Some(json!({"catalogs":["cannabis","flowers","fruit","vegetables","houseplants"]})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{value}");
+    assert_eq!(value["added"], 204);
+    let (_, cards, _) = client.call("GET", "/api/v1/strains", None).await;
+    let blue = cards
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "Blue Dream")
+        .unwrap();
+    assert!(blue["parent_one_id"].is_string());
+    assert!(blue["parent_two_id"].is_string());
+    let config = app.config.clone();
+    drop(client);
+    app.pool.close().await;
+    drop(app);
+    let reopened = App::open(config).await.unwrap();
+    assert_eq!(
+        db::query_scalar::<i64>("SELECT COUNT(*) FROM garden_catalog_imports")
+            .fetch_one(&reopened.pool)
+            .await
+            .unwrap(),
+        6
+    );
+}
+
+#[tokio::test]
+async fn starter_import_limit_rejects_entire_selection_without_marking_it_imported() {
+    let (_dir, app, mut client) = setup().await;
+    client.signup("limit@example.com").await;
+    let mut tx = app.pool.begin().await.unwrap();
+    for i in 0..990 {
+        let name = format!("Custom {i}");
+        db::query("INSERT INTO strains(id,garden_id,name,name_key,created_at) VALUES(?,?,?,?,1)")
+            .bind(format!("card-{i}"))
+            .bind(&client.garden)
+            .bind(&name)
+            .bind(name.to_lowercase())
+            .execute(&mut tx)
+            .await
+            .unwrap();
+    }
+    tx.commit().await.unwrap();
+    assert_eq!(
+        client
+            .call(
+                "POST",
+                "/api/v1/catalogs/import",
+                Some(json!({"catalogs":["herbs","flowers"]}))
+            )
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        client.call("GET", "/api/v1/catalogs/imports", None).await.1,
+        json!([])
+    );
+    assert_eq!(
+        client
+            .call("GET", "/api/v1/strains", None)
+            .await
+            .1
+            .as_array()
+            .unwrap()
+            .len(),
+        990
+    );
+    assert_eq!(
+        client
+            .call(
+                "POST",
+                "/api/v1/catalogs/import",
+                Some(json!({"catalogs":["houseplants"]}))
+            )
+            .await
+            .1["added"],
+        8
+    );
+}
