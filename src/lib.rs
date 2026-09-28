@@ -3,6 +3,7 @@ pub mod api;
 pub mod auth;
 pub mod automation;
 pub mod config;
+pub mod crosses;
 pub mod database;
 pub mod import;
 pub mod models;

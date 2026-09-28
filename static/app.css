@@ -219,6 +219,28 @@ body[data-page="strains"] .page-heading>div:first-child {min-width:0}
 
 .plant-cover{display:block;overflow:hidden}.plant-cover img{display:block;width:100%;height:100%;object-fit:cover}.plant-cover:hover img{filter:brightness(1.05)}
 
+/* Cross plans use the current theme's surfaces and keep drafts outside the binder. */
+.collection-tabs {display:flex;gap:8px;flex-wrap:wrap;margin:0 0 24px;border-bottom:1px solid var(--line);padding-bottom:12px}
+.collection-tabs a {border:1px solid var(--line);font-size:13px}
+.cross-grid {grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.cross-grid>.empty {grid-column:1/-1}
+.cross-plan {min-width:0}
+.cross-plan .eyebrow {margin:0}
+.cross-parents {display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px;align-items:center}
+.cross-parent {display:grid;gap:8px;border:1px solid var(--line);border-radius:7px;padding:14px;background:var(--paper);overflow-wrap:anywhere}
+.cross-parent small {color:var(--muted);font-size:10px}
+.cross-parent strong {font-size:13px;line-height:1.5}
+.cross-symbol,.cross-branch {color:var(--green);font-size:24px;text-align:center}
+.cross-branch {padding:10px}
+.cross-offspring {padding:20px;text-align:center;border:1px dashed var(--green);border-radius:8px;background:var(--sage);overflow-wrap:anywhere}
+.cross-offspring h2 {margin-bottom:8px}
+.cross-notes {font-size:13px;overflow-wrap:anywhere}
+.cross-actions {padding-top:15px;border-top:1px solid var(--line)}
+.cross-preview {padding:15px;border:1px dashed var(--input-line);border-radius:7px;background:var(--sage);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.cross-fields>* {min-width:0}
+.cross-fields :is(input,select) {width:100%;min-width:0}
+@media(max-width:1100px) {.cross-grid {grid-template-columns:minmax(0,1fr)}}
+
 /* The five additional palettes share semantic states; each supplies its own ink,
    surfaces, accents, and specimen colors. All artwork stays local and in CSS. */
 :root:is([data-theme="herbarium"],[data-theme="seed_catalog"],[data-theme="solarpunk"],[data-theme="alchemy"],[data-theme="neon_genetics"]) {

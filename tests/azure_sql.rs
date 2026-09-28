@@ -109,6 +109,19 @@ async fn azure_sql_end_to_end_contract() {
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 
+    let (status, plan) = request(&router,"POST","/api/v1/cross-plans",
+        Some(json!({"name":"Azure planned cross","parent_one_id":parent,"parent_two_id":strain_id,"notes":"A saved plan"}))).await;
+    assert_eq!(status, StatusCode::CREATED, "{plan}");
+    let convert_path = format!(
+        "/api/v1/cross-plans/{}/convert",
+        plan["id"].as_str().unwrap()
+    );
+    let (status, converted) = request(&router, "POST", &convert_path, Some(json!({}))).await;
+    assert_eq!(status, StatusCode::CREATED, "{converted}");
+    let (status, repeated) = request(&router, "POST", &convert_path, Some(json!({}))).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(converted["id"], repeated["id"]);
+
     let seed = json!({"name":"Tomato 🌱","variety":"O'Brien","quantity":2,"unit":"packets","purchase_year":2026});
     let (status, created) = request(&router, "POST", "/api/v1/seeds", Some(seed.clone())).await;
     assert_eq!(status, StatusCode::CREATED, "{created}");

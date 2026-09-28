@@ -172,6 +172,42 @@ with sqlite3.connect(sys.argv[1]) as db:
   assert.equal(await page.locator('.strain-card').count(),1);
   await page.getByLabel('Show cards',{exact:true}).selectOption('all');
   await page.screenshot({path:join(artifacts,'strain-collection-desktop.png'),fullPage:false});
+  await page.getByRole('link',{name:'Cross planner',exact:true}).click();
+  await page.getByRole('heading',{name:'Cross planner',exact:true}).waitFor();
+  await page.getByRole('button',{name:'+ Plan a cross',exact:true}).first().click();
+  await dialog().getByLabel('Working name',{exact:true}).fill('Browser planned cross');
+  await dialog().getByLabel('Parent 1',{exact:true}).selectOption({label:'Blue Dream'});
+  await dialog().getByLabel('Parent 2',{exact:true}).selectOption({label:'Gelato'});
+  await dialog().getByLabel('Species',{exact:true}).fill('Cannabis');
+  await dialog().getByLabel('Plan notes',{exact:true}).fill('Keep these parent records together.');
+  assert.match(await page.locator('#cross-preview').textContent(),/Blue Dream × Gelato → Browser planned cross/);
+  await dialog().getByRole('button',{name:'Save plan',exact:true}).click();await closed();
+  await page.locator('.cross-plan h2').filter({hasText:'Browser planned cross'}).waitFor();
+  await page.reload();await page.locator('.cross-plan').waitFor();
+  await page.getByRole('button',{name:'Edit plan',exact:true}).click();
+  await dialog().getByLabel('Plan notes',{exact:true}).fill('Updated plan notes.');
+  await dialog().getByRole('button',{name:'Save plan',exact:true}).click();await closed();
+  await page.getByText('Updated plan notes.',{exact:true}).waitFor();
+  await page.screenshot({path:join(artifacts,'cross-planner-desktop.png'),fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Cross planner overflows mobile');
+  await page.screenshot({path:join(artifacts,'cross-planner-mobile.png'),fullPage:true});
+  await page.getByRole('button',{name:'Edit plan',exact:true}).click();
+  await page.screenshot({path:join(artifacts,'cross-editor-mobile.png')});
+  const crossOverflow=await dialog().evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth,wide:[...el.querySelectorAll('*')].filter(child=>child.getBoundingClientRect().right>el.getBoundingClientRect().right).map(child=>[child.tagName,child.className,child.getBoundingClientRect().width])}));
+  assert.ok(crossOverflow.scroll<=crossOverflow.width,`Cross editor overflows mobile: ${JSON.stringify(crossOverflow)}`);
+  await dialog().getByRole('button',{name:'Cancel',exact:true}).click();await closed();
+  await page.getByRole('button',{name:'Create strain',exact:true}).click();
+  assert.equal(await dialog().getByLabel('Strain notes',{exact:true}).inputValue(),'Updated plan notes.');
+  await dialog().getByLabel('Strain name',{exact:true}).fill('Browser realized cross');
+  await dialog().getByRole('button',{name:'Create strain',exact:true}).click();await closed();
+  await page.locator('h1').filter({hasText:'Browser realized cross'}).waitFor();
+  await page.getByRole('link',{name:'Browser realized cross · Collected',exact:true}).waitFor();
+  assert.ok(await page.locator('.lineage-node').count()>=7);
+  await go('/strains?view=crosses');
+  await page.getByRole('link',{name:'View strain ↗',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Create strain',exact:true}).count(),0);
+  await page.setViewportSize({width:1440,height:1050});
   await go('/seeds');
   await page.getByRole('button',{name:'+ Add your first seeds',exact:true}).click();
   await dialog().getByLabel('Name',{exact:true}).fill('Tomato <seed>');
@@ -289,7 +325,7 @@ with sqlite3.connect(sys.argv[1]) as db:
     assert.equal(await page.getByLabel('Theme', {exact:true}).inputValue(),theme);
     for (const width of [1440,390]) {
       await page.setViewportSize({width,height:width===390?844:1050});
-      for (const path of ['/','/plants','/seeds','/strains','/journal','/calendar','/photos','/environment','/equipment','/settings']) {
+      for (const path of ['/','/plants','/seeds','/strains','/strains?view=crosses','/journal','/calendar','/photos','/environment','/equipment','/settings']) {
         await go(path);
         assert.equal(await page.locator('html').getAttribute('data-theme'),theme);
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${theme} overflow at ${width}px on ${path}`);

@@ -247,6 +247,9 @@ document.addEventListener('click',event=>{
     if(action==='upload-seed')uploadPhoto('seed',id);
     if(action==='seed')seedEditor(id);
     if(action==='strain')strainEditor(id);
+    if(action==='cross-plan')crossEditor(id);
+    if(action==='convert-cross')convertCross(id);
+    if(action==='delete-cross')deleteCross(id);
     if(action==='collect-strain')await setStrainStatus(id,'collected');
     if(action==='want-strain')await setStrainStatus(id,'wanted');
     if(action==='unwant-strain')await setStrainStatus(id,'unowned');

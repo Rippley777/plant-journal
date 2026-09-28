@@ -144,12 +144,25 @@ fn check(input: &StrainInput) -> Result<()> {
     Ok(())
 }
 async fn save(app: &App, garden: &str, id: &str, input: StrainInput, existing: bool) -> Result<()> {
-    check(&input)?;
     let mut tx = app.pool.begin().await?;
     lock_garden(&mut tx, garden).await?;
+    save_in_transaction(&mut tx, garden, id, input, existing).await?;
+    tx.commit().await?;
+    Ok(())
+}
+// Callers hold the garden lock so plan conversion and normal strain writes share
+// the same validation and can commit atomically.
+pub(crate) async fn save_in_transaction(
+    tx: &mut Transaction,
+    garden: &str,
+    id: &str,
+    input: StrainInput,
+    existing: bool,
+) -> Result<()> {
+    check(&input)?;
     let strains: Vec<Strain> = db::query_as("SELECT * FROM strains WHERE garden_id=?")
         .bind(garden)
-        .fetch_all(&mut tx)
+        .fetch_all(&mut *tx)
         .await?;
     if existing && !strains.iter().any(|s| s.id == id) {
         return Err(ApiError::missing());
@@ -198,7 +211,7 @@ async fn save(app: &App, garden: &str, id: &str, input: StrainInput, existing: b
     }
     // Inventory always counts as collected. Historical unlocks remain until explicitly edited.
     let holdings:i64=db::query_scalar("SELECT (SELECT COUNT(*) FROM plants WHERE strain_id=? AND garden_id=? AND archived=0)+(SELECT COUNT(*) FROM seeds WHERE strain_id=? AND garden_id=? AND quantity>0)")
-        .bind(id).bind(garden).bind(id).bind(garden).fetch_one(&mut tx).await?;
+        .bind(id).bind(garden).bind(id).bind(garden).fetch_one(&mut *tx).await?;
     let status = if holdings > 0 {
         "collected"
     } else {
@@ -206,12 +219,11 @@ async fn save(app: &App, garden: &str, id: &str, input: StrainInput, existing: b
     };
     if existing {
         db::query("UPDATE strains SET name=?,name_key=?,species=?,breeder=?,notes=?,status=?,parent_one_id=?,parent_two_id=?,lineage_note=?,source_url=? WHERE id=? AND garden_id=?")
-            .bind(input.name.trim()).bind(&key).bind(&input.species).bind(&input.breeder).bind(&input.notes).bind(status).bind(&input.parent_one_id).bind(&input.parent_two_id).bind(&input.lineage_note).bind(&input.source_url).bind(id).bind(garden).execute(&mut tx).await?;
+            .bind(input.name.trim()).bind(&key).bind(&input.species).bind(&input.breeder).bind(&input.notes).bind(status).bind(&input.parent_one_id).bind(&input.parent_two_id).bind(&input.lineage_note).bind(&input.source_url).bind(id).bind(garden).execute(&mut *tx).await?;
     } else {
         db::query("INSERT INTO strains(name,name_key,species,breeder,notes,status,parent_one_id,parent_two_id,lineage_note,source_url,id,garden_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)")
-            .bind(input.name.trim()).bind(&key).bind(&input.species).bind(&input.breeder).bind(&input.notes).bind(status).bind(&input.parent_one_id).bind(&input.parent_two_id).bind(&input.lineage_note).bind(&input.source_url).bind(id).bind(garden).bind(Utc::now().timestamp()).execute(&mut tx).await?;
+            .bind(input.name.trim()).bind(&key).bind(&input.species).bind(&input.breeder).bind(&input.notes).bind(status).bind(&input.parent_one_id).bind(&input.parent_two_id).bind(&input.lineage_note).bind(&input.source_url).bind(id).bind(garden).bind(Utc::now().timestamp()).execute(&mut *tx).await?;
     }
-    tx.commit().await?;
     Ok(())
 }
 pub async fn create(
@@ -247,10 +259,10 @@ pub async fn delete(
     if exists == 0 {
         return Err(ApiError::missing());
     }
-    let links:i64=db::query_scalar("SELECT (SELECT COUNT(*) FROM plants WHERE strain_id=?)+(SELECT COUNT(*) FROM seeds WHERE strain_id=?)+(SELECT COUNT(*) FROM strains WHERE parent_one_id=? OR parent_two_id=?)")
-        .bind(&id).bind(&id).bind(&id).bind(&id).fetch_one(&mut tx).await?;
+    let links:i64=db::query_scalar("SELECT (SELECT COUNT(*) FROM plants WHERE strain_id=?)+(SELECT COUNT(*) FROM seeds WHERE strain_id=?)+(SELECT COUNT(*) FROM strains WHERE parent_one_id=? OR parent_two_id=?)+(SELECT COUNT(*) FROM cross_plans WHERE parent_one_id=? OR parent_two_id=? OR converted_strain_id=?)")
+        .bind(&id).bind(&id).bind(&id).bind(&id).bind(&id).bind(&id).bind(&id).fetch_one(&mut tx).await?;
     if links > 0 {
-        return Err(ApiError::bad("This strain is linked to plants, seeds, or descendants. Remove those links before deleting it."));
+        return Err(ApiError::bad("This strain is linked to plants, seeds, descendants, or cross plans. Remove those links before deleting it."));
     }
     db::query("DELETE FROM strains WHERE id=? AND garden_id=?")
         .bind(&id)

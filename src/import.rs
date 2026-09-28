@@ -7,6 +7,7 @@ use std::{collections::BTreeMap, path::Path};
 const TABLES: &[(&str, &str)] = &[
     ("strains", "id,garden_id,name,name_key,species,breeder,notes,status,lineage_note,source_url,created_at"),
     ("strain_catalog_imports", "garden_id,imported_at,catalog_version"),
+    ("cross_plans", "id,garden_id,name,name_key,species,breeder,notes,parent_one_id,parent_two_id,converted_strain_id,converted_at,created_at,updated_at"),
     (
         "seeds",
         "id,name,variety,quantity,unit,supplier,purchase_year,storage_location,notes,created_at,strain_id",
@@ -85,7 +86,7 @@ pub async fn sqlite_to_database(
         // Older read-only source journals predate seed inventory or seed photos.
         if matches!(
             *table,
-            "seeds" | "photo_seeds" | "strains" | "strain_catalog_imports"
+            "seeds" | "photo_seeds" | "strains" | "strain_catalog_imports" | "cross_plans"
         ) {
             let exists: i64 = sqlx::query_scalar(
                 "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",

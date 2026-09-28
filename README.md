@@ -49,6 +49,10 @@ cards automatically. The original owner's garden starts with 152 curated cannabi
 strains and selected documented parentage. See [strain collection and lineage](docs/strains.md)
 for collection rules, sources, and database upgrade details.
 
+Use **Strains → Cross planner** to save ideas with two parent strains and notes.
+When you have the cross, choose **Create strain** to turn the plan into a collected
+card with its recorded ancestry. The original plan stays linked to that card.
+
 Choose **Settings → Appearance → Theme** for seven looks: the default **Fieldnotes**,
 **Night Arcade**, **Herbarium**, **Seed Catalog ’79**, **Solarpunk Greenhouse**,
 **Alchemy Lab**, and **Neon Genetics**. Each includes matching strain cards and

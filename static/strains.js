@@ -39,6 +39,7 @@ function strainCard(strain) {
   return `<a class="strain-card ${strainTone(strain)} ${strain.status === 'collected' ? 'is-collected' : 'is-locked'}" href="${strainUrl(strain.id)}" aria-label="${esc(strain.name)} · ${strainStatusLabel(strain.status)}"><div class="strain-card-top"><span>FIELDNOTES / ${number}</span><span>${strain.status === 'collected' ? '✦' : '◇'}</span></div><div class="strain-card-art">${strainArt(strain)}<span class="strain-card-seal">${strain.status === 'wanted' ? 'WISHLIST' : strain.status === 'collected' ? 'IN YOUR COLLECTION' : 'UNDISCOVERED'}</span></div><div class="strain-card-copy"><p class="strain-card-species">${esc(strain.species || 'Plant strain')}</p><h2>${esc(strain.name)}</h2><p class="strain-card-parents">${parents.length ? parents.map(p => esc(p.name)).join(' × ') : 'An ancestry waiting to unfold'}</p><div class="strain-card-bottom"><span>${strainStatusLabel(strain.status)}</span><span>View lineage ↗</span></div></div></a>`;
 }
 async function strainsPage() {
+  if (new URLSearchParams(location.search).get('view') === 'crosses') return crossPlansPage();
   const id = new URLSearchParams(location.search).get('strain');
   const selected = strainById(id);
   if (id && !selected) {
@@ -51,6 +52,7 @@ async function strainsPage() {
   const collected=strains.filter(s => s.status==='collected').length, wanted=strains.filter(s => s.status==='wanted').length;
   $('#content').innerHTML=`<section class="collection-banner"><div><p class="eyebrow">THE GENETICS BINDER</p><h2>Grow your collection.</h2><p>Keep the classics. Discover the connections. Make room for your own hybrids.</p><div class="collection-progress"><progress value="${collected}" max="${Math.max(strains.length,1)}" aria-label="Strains collected"></progress><span>${collected} of ${strains.length} collected</span></div></div><div class="collection-counts"><div><strong>${collected}</strong><span>COLLECTED</span></div><div><strong>${wanted}</strong><span>ON YOUR WISHLIST</span></div></div></section><div class="toolbar collection-toolbar"><label class="collection-search" for="strain-search">Find a strain<input id="strain-search" type="search" value="${esc(strainSearch)}" placeholder="Search names, breeders, or parents…"></label><div><label for="strain-status">Show cards</label><select id="strain-status">${[['all','All strains'],['collected','Collected'],['wanted','Wanted'],['unowned','Not collected']].map(([v,t])=>`<option value="${v}" ${strainStatus===v?'selected':''}>${t}</option>`).join('')}</select></div></div><p class="helper" id="strain-count" role="status"></p><div class="strain-grid section-space" id="strain-cards"></div><p class="helper section-space">Cards unlock when you add a linked plant, add seeds you have on hand, or mark a strain collected. Your collection keeps its history when seeds run out. Collections are shared within this garden.</p>`;
   $('#strain-search').addEventListener('input',e=>{strainSearch=e.target.value;renderStrainCards();});
+  $('#content').insertAdjacentHTML('afterbegin', strainViews(false));
   $('#strain-status').addEventListener('change',e=>{strainStatus=e.target.value;renderStrainCards();});
   renderStrainCards();
 }
@@ -93,7 +95,7 @@ async function setStrainStatus(id,status) {
 }
 function deleteStrain(id) {
   const s=strainById(id);
-  modal('Delete strain?',formWrap(`<p>Remove ${esc(s.name)} and its card? Strains linked to plants, seeds, or descendants must be unlinked first.</p>`,'Delete strain'),async()=>{
+  modal('Delete strain?',formWrap(`<p>Remove ${esc(s.name)} and its card? Strains linked to plants, seeds, descendants, or cross plans must be unlinked first.</p>`,'Delete strain'),async()=>{
     await api('/strains/'+id,'DELETE');history.replaceState(null,'','/strains');notice('Strain removed.');
   });
 }

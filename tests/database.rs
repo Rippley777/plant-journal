@@ -119,6 +119,8 @@ async fn seed(app: &App) {
 async fn import_preserves_history_links_and_claims_but_disables_automation() {
     let (source_dir, source) = fixture().await;
     seed(&source).await;
+    db::query("INSERT INTO cross_plans(id,garden_id,name,name_key,notes,parent_one_id,parent_two_id,created_at,updated_at) SELECT 'plan',garden_id,'Future cross','future cross','Keep this idea',id,id,1000,1000 FROM strains WHERE name='Blue Dream'")
+        .execute(&source.pool).await.unwrap();
     db::query("UPDATE plants SET strain_id=(SELECT id FROM strains WHERE name='Blue Dream') WHERE id='plant'").execute(&source.pool).await.unwrap();
     let (_destination_dir, destination) = import_destination().await;
     let counts = import::sqlite_to_database(
@@ -129,6 +131,12 @@ async fn import_preserves_history_links_and_claims_but_disables_automation() {
     .unwrap();
     assert_eq!(counts["plants"], 1);
     assert_eq!(counts["strains"], 152);
+    assert_eq!(counts["cross_plans"], 1);
+    let plan_notes: String = db::query_scalar("SELECT notes FROM cross_plans WHERE id='plan'")
+        .fetch_one(&destination.pool)
+        .await
+        .unwrap();
+    assert_eq!(plan_notes, "Keep this idea");
     let lineage: String = db::query_scalar("SELECT p.name FROM strains s JOIN strains p ON p.id=s.parent_one_id WHERE s.name='Blue Dream'").fetch_one(&destination.pool).await.unwrap();
     assert_eq!(lineage, "Blueberry");
     assert_eq!(counts["photo_plants"], 1);
@@ -213,6 +221,7 @@ async fn failed_import_rolls_back_all_preceding_tables() {
         "readings",
         "strains",
         "strain_catalog_imports",
+        "cross_plans",
     ] {
         let count: i64 = db::query_scalar(&format!("SELECT COUNT(*) FROM {table}"))
             .fetch_one(&destination.pool)

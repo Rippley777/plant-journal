@@ -24,8 +24,28 @@ Card artwork is an original botanical emblem, not a photograph of the cultivar.
   strain may occupy both slots. Shared ancestors are valid; ancestry loops are
   rejected, including concurrent edits.
 - Deleting a strain requires removing its plant, seed, and descendant links first.
+  Cross plans also hold references to their parents and created strains; delete
+  the plan first if you need to remove one of those records.
   Strains and collection status belong to the selected garden and follow its
   collaborator permissions; other gardens cannot access or link them.
+
+## Cross planner
+
+Open **Strains → Cross planner → Plan a cross**. Choose two strains already in the
+garden's collection, give the plan a working name, and add optional species,
+breeder, and notes. Parent order does not imply sex, and the same strain may fill
+both slots. Save and edit plans without adding strain cards or collecting parents.
+
+When you have the cross, choose **Create strain**. Review its final name and notes;
+the app creates a collected card with both recorded parents in its ancestry. The
+original plan stays linked to the created strain. Conversion happens once, even
+if a request is retried. Duplicate strain names must be changed before conversion.
+Converted plans remain as history; edit the strain record for subsequent changes.
+Deleting a plan keeps its parents and any created strain.
+
+Use **Show crosses** to view planned, created, or all crosses. Plans belong to the
+selected garden and follow the same collaborator access as strain records. A plan
+records intended parentage; it does not predict the traits of the resulting cross.
 
 ## Starter binder
 
@@ -63,7 +83,8 @@ recreating deleted cards.
 
 ## Database upgrade
 
-Schema version 6 tracks the catalog import version so existing gardens receive the
+Schema version 7 adds `cross_plans` with garden-scoped parent links and an optional
+reference to the created strain. Schema version 6 tracks the catalog import version so existing gardens receive the
 new cards once. Schema version 5 adds `strains`, `strain_catalog_imports`, and nullable `strain_id`
 columns on `plants` and `seeds`. A strain has two optional references to parent
 strains rather than storing its family tree as a text field. Existing data is
@@ -75,3 +96,9 @@ The API exposes `GET/POST /api/v1/strains` and `PUT/DELETE /api/v1/strains/{id}`
 Plant and seed writes accept an optional `strain_id`. Strain writes include `name`,
 `status` (`unowned`, `wanted`, `collected`), and optional `species`, `breeder`,
 `notes`, `parent_one_id`, `parent_two_id`, `lineage_note`, and `source_url`.
+
+Cross plans use `GET/POST /api/v1/cross-plans` and `PUT/DELETE /api/v1/cross-plans/{id}`.
+Plan writes require `name`, `parent_one_id`, and `parent_two_id`, with optional
+`species`, `breeder`, and `notes`. `POST /api/v1/cross-plans/{id}/convert` accepts a
+JSON object with optional overrides for name, species, breeder, and notes. It
+returns the strain `id` (201 when created; 200 when already converted).

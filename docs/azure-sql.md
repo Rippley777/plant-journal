@@ -25,7 +25,7 @@ cargo run --locked
 
 `AZURE_SQL_PASSWORD` must be set as well. Do not put real credentials in example commands committed to this repository. `server` and `name` in TOML can replace the corresponding environment variables; environment variables take precedence. Credentials always come from the names configured by `username_env` and `password_env`.
 
-The `--migrate` command exits after schema setup, without starting the HTTP server or hardware workers. Migrations execute in a transaction under a database application lock and are versioned in `dbo.journal_schema`. Normal startup also migrates when `database.migrate = true`; with `false`, it verifies schema version 6 is installed. Use a dedicated database: table names are under `dbo` and could collide with unrelated application tables.
+The `--migrate` command exits after schema setup, without starting the HTTP server or hardware workers. Migrations execute in a transaction under a database application lock and are versioned in `dbo.journal_schema`. Normal startup also migrates when `database.migrate = true`; with `false`, it verifies schema version 7 is installed. Use a dedicated database: table names are under `dbo` and could collide with unrelated application tables.
 
 The default Rust startup (`cargo run` without `PLANT_CONFIG`) still uses SQLite, so existing journals and developer tests work without Azure credentials. The supplied Pi deployment configuration selects Azure SQL explicitly.
 
@@ -174,7 +174,7 @@ Before deploying the version with seed inventory, run the new binary with
 (as in the setup instructions above). This applies `0002_seed_inventory.sql`,
 adds the `seeds` table, and retains existing journal data. It is safe to rerun:
 applied versions are recorded in `dbo.journal_schema`. The cloud runtime keeps
-`database.migrate = false`. The current application requires version 6 at startup. Stop older application instances
+`database.migrate = false`. The current application requires version 7 at startup. Stop older application instances
 before the multi-user upgrade; they do not enforce garden isolation.
 
 SQLite applies this migration automatically on startup. SQLite imports include
@@ -202,7 +202,7 @@ image requests check garden membership.
 Back up first, stop older web and Pi instances, run the new binary with `--migrate`
 using the migration identity, then activate the owner with `--set-password
 ally.rippley@gmail.com` in an interactive terminal using the same database config.
-Start only the upgraded binaries. The runtime requires schema version 6 even when
+Start only the upgraded binaries. The runtime requires schema version 7 even when
 `database.migrate = false`. See [account operations](accounts.md).
 
 The legacy SQLite importer supports journals with just the original account and
@@ -232,3 +232,14 @@ counts as existing data, and the importer deliberately refuses nonempty destinat
 
 Schema version 6 adds the catalog import version. Migrate Azure SQL before starting
 this release so the original garden can receive the 100 additional cards once.
+
+
+## Cross planner (schema version 7)
+
+Migration `0007_cross_plans.sql` adds garden-scoped draft crosses, their parent
+strain references, and a link to the strain created by each converted plan.
+Run `cargo run --locked -- --migrate` using the configured migration identity before
+starting an Azure runtime with automatic migration disabled. SQLite applies the
+migration on startup. Existing strains, photos, and inventory remain intact.
+Single-garden SQLite imports preserve plans and conversion links and accept older
+sources without a planner table.
