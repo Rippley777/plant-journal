@@ -262,3 +262,9 @@ PLAYWRIGHT_MODULE=/tmp/plant-journal-browser/node_modules/playwright node tests/
 ```
 
 The test launches its own service with an isolated temporary database, exercises desktop and mobile workflows, checks for browser errors and horizontal overflow, saves screenshots to its temporary directory, and shuts down the service afterward. It does not modify your normal journal. Set `PLANT_ARTIFACTS` to choose a screenshot directory.
+
+## License
+
+[MIT NON-AI License](LICENSE). This custom, source-available license permits use, modification, and redistribution subject to its terms, but **prohibits all AI/ML use of the code**, including training, inference, AI integrations, and supplying the code to AI coding tools, unless separately authorized in writing by the applicable copyright holder(s). It is not the standard MIT License or an OSI-approved open-source license.
+
+Third-party components and assets retain their own licenses. Previously granted licenses are not retroactively revoked. See the license file for the full terms.
