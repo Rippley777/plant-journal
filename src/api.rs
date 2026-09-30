@@ -50,12 +50,23 @@ impl IntoResponse for ApiError {
 struct Page<'a> {
     page: &'a str,
     title: &'a str,
+    analytics: crate::analytics::Analytics,
+}
+#[derive(Template)]
+#[template(path = "auth.html")]
+struct AuthPage {
+    analytics: crate::analytics::Analytics,
 }
 async fn page(Path(page): Path<String>) -> Response {
     render(&page)
 }
-async fn auth_page() -> Html<&'static str> {
-    Html(include_str!("../templates/auth.html"))
+async fn auth_page() -> Response {
+    match (AuthPage {
+        analytics: crate::analytics::Analytics::from_env(),
+    }).render() {
+        Ok(html) => Html(html).into_response(),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
 }
 async fn home() -> Response {
     render("dashboard")
@@ -74,7 +85,11 @@ fn render(page: &str) -> Response {
         "settings" => "Settings",
         _ => return StatusCode::NOT_FOUND.into_response(),
     };
-    match (Page { page, title }).render() {
+    match (Page {
+        page,
+        title,
+        analytics: crate::analytics::Analytics::from_env(),
+    }).render() {
         Ok(html) => Html(html).into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -83,6 +98,7 @@ pub fn router(app: Arc<App>) -> Router {
     Router::new()
         .route("/login", get(auth_page))
         .route("/signup", get(auth_page))
+        .route("/assets/house-edge-0.1.1.js", get(|| async { ([(header::CONTENT_TYPE,"text/javascript; charset=utf-8")],include_str!("../static/vendor/house-edge-0.1.1.js")) }))
         .route("/assets/auth.js", get(|| async { ([(header::CONTENT_TYPE,"text/javascript; charset=utf-8")],include_str!("../static/auth.js")) }))
         .route("/api/v1/auth/signup", post(auth::signup))
         .route("/api/v1/auth/login", post(auth::login))
@@ -227,7 +243,10 @@ async fn same_origin(req: Request<Body>, next: Next) -> Response {
     response
         .headers_mut()
         .insert("x-content-type-options", "nosniff".parse().unwrap());
-    response.headers_mut().insert("content-security-policy","default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'".parse().unwrap());
+    let policy = crate::analytics::Analytics::from_env().content_security_policy();
+    if let Ok(policy) = policy.parse() {
+        response.headers_mut().insert("content-security-policy", policy);
+    }
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, "no-store".parse().unwrap());

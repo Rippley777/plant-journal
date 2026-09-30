@@ -268,3 +268,11 @@ The test launches its own service with an isolated temporary database, exercises
 [MIT NON-AI License](LICENSE). This custom, source-available license permits use, modification, and redistribution subject to its terms, but **prohibits all AI/ML use of the code**, including training, inference, AI integrations, and supplying the code to AI coding tools, unless separately authorized in writing by the applicable copyright holder(s). It is not the standard MIT License or an OSI-approved open-source license.
 
 Third-party components and assets retain their own licenses. Previously granted licenses are not retroactively revoked. See the license file for the full terms.
+
+## House Edge analytics
+
+Browser analytics is bundled in `static/vendor/house-edge-0.1.1.js` (built from House Edge's browser SDK). It tracks page views, navigation, anonymous sessions, errors, and Web Vitals while respecting Do Not Track.
+
+Create a House Edge project with key `plant-journal` and allow your application's exact origin. Set `HOUSE_EDGE_KEY` to its **browser ingestion key**, `HOUSE_EDGE_ENDPOINT` to your collector URL ending in `/api/collect`, and `HOUSE_EDGE_ENABLED=true` in the server environment, then restart. `HOUSE_EDGE_PROJECT` overrides the project key. Only these public browser settings reach the HTML. Missing or invalid configuration disables tracking. The server allows the configured collector origin through its Content Security Policy.
+
+These are runtime settings. Keep local analytics disabled or use a separate development project. After opening a configured page, wait about five seconds and verify `page_view` and `session_start` in House Edge's Live Activity. When updating the SDK, copy a fresh versioned script bundle and its license from House Edge and rebuild/redeploy the application.

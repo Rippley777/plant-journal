@@ -1,4 +1,5 @@
 pub mod adapters;
+pub mod analytics;
 pub mod api;
 pub mod auth;
 pub mod automation;
